@@ -64,12 +64,22 @@ class _ItemPageState extends State<ItemPage> {
               return const Center(child: Text('暂无物品，点击右下角添加', style: TextStyle(fontSize: 18)));
             }
             return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.85,
+              padding: EdgeInsets.all(() {
+                try { return Hive.box('main_sort').get('item_pad') as double? ?? 16; } catch (_) { return 16.0; }
+              }()),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: (() {
+                  try { return Hive.box('main_sort').get('item_col') as int? ?? 2; } catch (_) { return 2; }
+                })(),
+                crossAxisSpacing: (() {
+                  try { return Hive.box('main_sort').get('item_hgap') as double? ?? 16; } catch (_) { return 16.0; }
+                })(),
+                mainAxisSpacing: (() {
+                  try { return Hive.box('main_sort').get('item_vgap') as double? ?? 16; } catch (_) { return 16.0; }
+                })(),
+                childAspectRatio: (() {
+                  try { return Hive.box('main_sort').get('item_ratio') as double? ?? 0.85; } catch (_) { return 0.85; }
+                })(),
               ),
               itemCount: box.length,
               itemBuilder: (context, index) {
@@ -96,22 +106,57 @@ class _ItemPageState extends State<ItemPage> {
                     );
                     if (confirm == true) _deleteItem(index);
                   },
-                  child: Card(
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    shadowColor: Colors.black12,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFB2E5C8), Colors.white],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFFB2E5C8).withOpacity(0.10),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                      border: Border.all(color: Color(0xFFB2E5C8).withOpacity(0.18), width: 1.2),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(18.0),
+                      padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 10),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 8),
-                          Text(item.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
-                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFB2E5C8),
+                                ),
+                                child: const Icon(Icons.inventory, color: Colors.white, size: 22),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  item.name,
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c)),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
                           Text('标签: ${item.tag}', style: const TextStyle(fontSize: 15, color: Colors.blueGrey), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
-                          const SizedBox(height: 8),
-                          Text('价格: ¥${_formatPrice(item.price)}', style: const TextStyle(fontSize: 16, color: Colors.deepOrange), textAlign: TextAlign.center),
+                          const SizedBox(height: 10),
+                          Text('价格: ¥${_formatPrice(item.price)}', style: const TextStyle(fontSize: 16, color: Colors.deepOrange), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),
@@ -170,56 +215,90 @@ class _ItemEditDialogState extends State<ItemEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.item == null ? '添加物品' : '编辑物品'),
-      content: SingleChildScrollView(
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFB2E5C8), Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFFB2E5C8).withOpacity(0.15),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Text(widget.item == null ? '添加物品' : '编辑物品', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c))),
+            const SizedBox(height: 18),
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: '物品名称'),
+              decoration: const InputDecoration(labelText: '物品名称', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
             ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: _tag,
               items: widget.tags.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
               onChanged: (v) => setState(() => _tag = v ?? widget.tags.first),
-              decoration: const InputDecoration(labelText: '标签'),
+              decoration: const InputDecoration(labelText: '标签', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
             ),
+            const SizedBox(height: 12),
             TextField(
               controller: _priceController,
-              decoration: const InputDecoration(labelText: '价格'),
+              decoration: const InputDecoration(labelText: '价格', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
               keyboardType: TextInputType.numberWithOptions(decimal: true),
             ),
+            const SizedBox(height: 12),
             TextField(
               controller: _notesController,
-              decoration: const InputDecoration(labelText: '备注'),
+              decoration: const InputDecoration(labelText: '备注', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+                  child: const Text('取消'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF185a9d),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    if (_nameController.text.trim().isEmpty) return;
+                    Navigator.pop(
+                      context,
+                      Item(
+                        name: _nameController.text.trim(),
+                        tag: _tag,
+                        price: double.tryParse(_priceController.text.trim()) ?? 0.0,
+                        notes: _notesController.text.trim(),
+                        imagePath: null,
+                      ),
+                    );
+                  },
+                  child: const Text('保存'),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_nameController.text.trim().isEmpty) return;
-            Navigator.pop(
-              context,
-              Item(
-                name: _nameController.text.trim(),
-                tag: _tag,
-                price: double.tryParse(_priceController.text.trim()) ?? 0.0,
-                notes: _notesController.text.trim(),
-                imagePath: null,
-              ),
-            );
-          },
-          child: const Text('保存'),
-        ),
-      ],
     );
   }
 } 

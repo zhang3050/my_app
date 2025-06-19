@@ -53,12 +53,22 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
               return const Center(child: Text('暂无密码，点击右下角添加', style: TextStyle(fontSize: 18)));
             }
             return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.2,
+              padding: EdgeInsets.all(() {
+                try { return Hive.box('main_sort').get('password_pad') as double? ?? 16; } catch (_) { return 16.0; }
+              }()),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: (() {
+                  try { return Hive.box('main_sort').get('password_col') as int? ?? 2; } catch (_) { return 2; }
+                })(),
+                crossAxisSpacing: (() {
+                  try { return Hive.box('main_sort').get('password_hgap') as double? ?? 16; } catch (_) { return 16.0; }
+                })(),
+                mainAxisSpacing: (() {
+                  try { return Hive.box('main_sort').get('password_vgap') as double? ?? 16; } catch (_) { return 16.0; }
+                })(),
+                childAspectRatio: (() {
+                  try { return Hive.box('main_sort').get('password_ratio') as double? ?? 1.2; } catch (_) { return 1.2; }
+                })(),
               ),
               itemCount: box.length,
               itemBuilder: (context, index) {
@@ -85,12 +95,25 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
                     );
                     if (confirm == true) _deletePassword(index);
                   },
-                  child: Card(
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    shadowColor: Colors.black12,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFA5D6F9), Colors.white],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFFA5D6F9).withOpacity(0.10),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                      border: Border.all(color: Color(0xFFA5D6F9).withOpacity(0.18), width: 1.2),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(18.0),
+                      padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 10),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -98,19 +121,28 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFA5D6F9),
+                                ),
+                                child: const Icon(Icons.lock, color: Colors.white, size: 22),
+                              ),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   item.title,
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                                  maxLines: 1,
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c)),
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
                                 ),
                               ),
-                              const Icon(Icons.lock, color: Colors.deepPurple, size: 28),
                             ],
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           Text('账号: ${item.username}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
                           const SizedBox(height: 10),
                           Text('备注: ${item.notes}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Colors.grey), textAlign: TextAlign.center),
@@ -172,53 +204,87 @@ class _PasswordEditDialogState extends State<PasswordEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.item == null ? '添加密码' : '编辑密码'),
-      content: SingleChildScrollView(
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFA5D6F9), Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFFA5D6F9).withOpacity(0.15),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Text(widget.item == null ? '添加密码' : '编辑密码', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c))),
+            const SizedBox(height: 18),
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: '标题'),
+              decoration: const InputDecoration(labelText: '标题', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
             ),
+            const SizedBox(height: 12),
             TextField(
               controller: _usernameController,
-              decoration: const InputDecoration(labelText: '账号'),
+              decoration: const InputDecoration(labelText: '账号', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
             ),
+            const SizedBox(height: 12),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: '密码'),
+              decoration: const InputDecoration(labelText: '密码', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
               obscureText: true,
             ),
+            const SizedBox(height: 12),
             TextField(
               controller: _notesController,
-              decoration: const InputDecoration(labelText: '备注'),
+              decoration: const InputDecoration(labelText: '备注', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+                  child: const Text('取消'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFa6c1ee),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    if (_titleController.text.trim().isEmpty) return;
+                    Navigator.pop(
+                      context,
+                      PasswordItem(
+                        title: _titleController.text.trim(),
+                        username: _usernameController.text.trim(),
+                        password: _passwordController.text.trim(),
+                        notes: _notesController.text.trim(),
+                      ),
+                    );
+                  },
+                  child: const Text('保存'),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_titleController.text.trim().isEmpty) return;
-            Navigator.pop(
-              context,
-              PasswordItem(
-                title: _titleController.text.trim(),
-                username: _usernameController.text.trim(),
-                password: _passwordController.text.trim(),
-                notes: _notesController.text.trim(),
-              ),
-            );
-          },
-          child: const Text('保存'),
-        ),
-      ],
     );
   }
 } 

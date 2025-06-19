@@ -160,82 +160,116 @@ class _CheckinPageState extends State<CheckinPage> {
               return const Center(child: Text('暂无打卡项目，点击右下角添加', style: TextStyle(fontSize: 18)));
             }
             return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+              padding: EdgeInsets.all(() {
+                try { return Hive.box('main_sort').get('checkin_pad') as double? ?? 16; } catch (_) { return 16.0; }
+              }()),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: (() {
+                  try { return Hive.box('main_sort').get('checkin_col') as int? ?? 2; } catch (_) { return 2; }
+                })(),
+                crossAxisSpacing: (() {
+                  try { return Hive.box('main_sort').get('checkin_hgap') as double? ?? 16; } catch (_) { return 16.0; }
+                })(),
+                mainAxisSpacing: (() {
+                  try { return Hive.box('main_sort').get('checkin_vgap') as double? ?? 16; } catch (_) { return 16.0; }
+                })(),
+                childAspectRatio: (() {
+                  try { return Hive.box('main_sort').get('checkin_ratio') as double? ?? 1.2; } catch (_) { return 1.2; }
+                })(),
               ),
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
                 final checked = item.history.contains(today);
-                return IntrinsicHeight(
-                  child: GestureDetector(
-                    onTap: () => _addOrEditCheckin(item: item, index: _box.values.toList().indexOf(item)), // 点击编辑
-                    onLongPress: () async {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (_) => AlertDialog(
-                          title: const Text('删除打卡'),
-                          content: Text('确定要删除"${item.title}"吗？'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('取消'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: const Text('删除', style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
+                return GestureDetector(
+                  onTap: () {
+                    if (item.type == 'daily') {
+                      _toggleCheckin(_box.values.toList().indexOf(item));
+                    } else {
+                      _showCheckinDialog(item, _box.values.toList().indexOf(item), checked);
+                    }
+                  },
+                  onLongPress: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('删除打卡'),
+                        content: Text('确定要删除"${item.title}"吗？'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('取消'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('删除', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) _deleteCheckin(_box.values.toList().indexOf(item));
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFD580), Colors.white],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Color(0xFFFFD580).withOpacity(0.10),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
                         ),
-                      );
-                      if (confirm == true) _deleteCheckin(_box.values.toList().indexOf(item));
-                    },
-                    child: Card(
-                      elevation: 6,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      shadowColor: Colors.black12,
-                      color: checked
-                          ? Colors.grey[300]
-                          : Colors.lightBlue[100],
-                      child: Padding(
-                        padding: const EdgeInsets.all(18.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    item.title,
-                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    checked ? Icons.check_circle : Icons.radio_button_unchecked,
-                                    color: checked ? Colors.green : Colors.grey,
-                                    size: 32,
-                                  ),
-                                  onPressed: () => _showCheckinDialog(item, _box.values.toList().indexOf(item), checked),
-                                  tooltip: checked ? '取消今日打卡/补打卡' : '打卡/补打卡',
-                                ),
-                              ],
+                      ],
+                      border: Border.all(color: Color(0xFFFFD580).withOpacity(0.18), width: 1.2),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFFFFD580),
                             ),
-                            const SizedBox(height: 10),
-                            Text('类型: ${_typeText(item.type)}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
-                            const SizedBox(height: 10),
-                            Text('已打卡: ${_getCheckinDays(item)}天', style: const TextStyle(fontSize: 16, color: Colors.deepOrange), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
-                          ],
-                        ),
+                            child: Icon(
+                              checked ? Icons.check_circle : Icons.radio_button_unchecked,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            item.title,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3d246c)),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '类型: ${_typeText(item.type)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 13, color: Colors.blueGrey),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '已打卡: ${_getCheckinDays(item)}天',
+                            style: const TextStyle(fontSize: 13, color: Colors.deepOrange),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -381,16 +415,37 @@ class _CheckinEditDialogState extends State<CheckinEditDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.item == null ? '添加打卡' : '编辑打卡'),
-      content: SingleChildScrollView(
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFD580), Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFFFFD580).withOpacity(0.15),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Text(widget.item == null ? '添加打卡' : '编辑打卡', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c))),
+            const SizedBox(height: 18),
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: '打卡内容'),
+              decoration: const InputDecoration(labelText: '打卡内容', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
             ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: _type,
               items: const [
@@ -399,31 +454,42 @@ class _CheckinEditDialogState extends State<CheckinEditDialog> {
                 DropdownMenuItem(value: 'monthly', child: Text('每月')),
               ],
               onChanged: (v) => setState(() => _type = v ?? 'daily'),
-              decoration: const InputDecoration(labelText: '打卡类型'),
+              decoration: const InputDecoration(labelText: '打卡类型', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+                  child: const Text('取消'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFff4e50),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    if (_titleController.text.trim().isEmpty) return;
+                    Navigator.pop(
+                      context,
+                      CheckinItem(
+                        title: _titleController.text.trim(),
+                        type: _type,
+                        history: widget.item?.history ?? [],
+                      ),
+                    );
+                  },
+                  child: const Text('保存'),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (_titleController.text.trim().isEmpty) return;
-            Navigator.pop(
-              context,
-              CheckinItem(
-                title: _titleController.text.trim(),
-                type: _type,
-                history: widget.item?.history ?? [],
-              ),
-            );
-          },
-          child: const Text('保存'),
-        ),
-      ],
     );
   }
 } 
