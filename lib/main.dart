@@ -78,15 +78,14 @@ class _MainScaffoldState extends State<MainScaffold> {
   /// 加载首页卡片顺序，若无则用默认顺序
   List<_ModuleCardInfo> _loadModuleCards() {
     final defaultCards = [
-      _ModuleCardInfo(icon: Icons.lock, title: '密码本', pageIndex: 1),
-      _ModuleCardInfo(icon: Icons.check_circle, title: '打卡', pageIndex: 2),
-      _ModuleCardInfo(icon: Icons.inventory, title: '物品管理', pageIndex: 3),
-      _ModuleCardInfo(icon: Icons.bug_report, title: '日志', pageIndex: 4),
+      _ModuleCardInfo(iconKey: 'lock', title: '密码本', pageIndex: 1),
+      _ModuleCardInfo(iconKey: 'check_circle', title: '打卡', pageIndex: 2),
+      _ModuleCardInfo(iconKey: 'inventory', title: '物品管理', pageIndex: 3),
+      _ModuleCardInfo(iconKey: 'bug_report', title: '日志', pageIndex: 4),
     ];
     final saved = box.get('cards');
     if (saved is List) {
       try {
-        // 保证所有模块都在首页，且顺序为用户自定义
         final loaded = saved.map((e) => _ModuleCardInfo.fromMap(Map<String, dynamic>.from(e))).toList();
         final existPages = loaded.map((e) => e.pageIndex).toSet();
         for (final def in defaultCards) {
@@ -321,7 +320,7 @@ class _HomePageState extends State<HomePage> {
           itemCount: _cards.length,
           itemBuilder: (context, idx) {
             final card = _cards[idx];
-            return _buildModuleCard(context, card.icon, card.title, card.pageIndex, key: ValueKey(card.title));
+            return _buildModuleCard(context, card.iconKey, card.title, card.pageIndex, key: ValueKey(card.title));
           },
         );
       },
@@ -347,7 +346,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// 构建首页功能卡片
-  Widget _buildModuleCard(BuildContext context, IconData icon, String title, int pageIndex, {Key? key}) {
+  Widget _buildModuleCard(BuildContext context, String iconKey, String title, int pageIndex, {Key? key}) {
     // 不同模块主色
     final List<Color> mainColors = [
       Color(0xFFF5F6FA), // 默认
@@ -373,7 +372,6 @@ class _HomePageState extends State<HomePage> {
     return GestureDetector(
       key: key,
       onTap: () {
-        // 跳转到对应模块
         final state = context.findAncestorStateOfType<_MainScaffoldState>();
         state?.setState(() {
           state._selectedIndex = pageIndex;
@@ -423,7 +421,7 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                       child: Center(
-                        child: Icon(icon, size: 18, color: Colors.white),
+                        child: Icon(_iconFromKey(iconKey), size: 18, color: Colors.white),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -479,16 +477,27 @@ class _HomePageState extends State<HomePage> {
 
 /// 首页卡片信息结构体
 class _ModuleCardInfo {
-  final IconData icon;
+  final String iconKey;
   final String title;
   final int pageIndex;
-  _ModuleCardInfo({required this.icon, required this.title, required this.pageIndex});
-  Map<String, dynamic> toMap() => {'icon': icon.codePoint, 'title': title, 'pageIndex': pageIndex};
+  _ModuleCardInfo({required this.iconKey, required this.title, required this.pageIndex});
+  Map<String, dynamic> toMap() => {'iconKey': iconKey, 'title': title, 'pageIndex': pageIndex};
   static _ModuleCardInfo fromMap(Map<String, dynamic> map) => _ModuleCardInfo(
-    icon: IconData(map['icon'], fontFamily: 'MaterialIcons'),
+    iconKey: map['iconKey'],
     title: map['title'],
     pageIndex: map['pageIndex'],
   );
+}
+
+// 在用到的地方
+IconData _iconFromKey(String key) {
+  switch (key) {
+    case 'lock': return Icons.lock;
+    case 'check_circle': return Icons.check_circle;
+    case 'inventory': return Icons.inventory;
+    case 'bug_report': return Icons.bug_report;
+    default: return Icons.extension;
+  }
 }
 
 // 工具方法：颜色加深
