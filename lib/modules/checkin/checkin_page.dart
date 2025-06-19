@@ -1,28 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'password_item.dart';
+import 'checkin_item.dart';
 
-class PasswordBookPage extends StatefulWidget {
-  const PasswordBookPage({super.key});
+class CheckinPage extends StatefulWidget {
+  const CheckinPage({super.key});
 
   @override
-  State<PasswordBookPage> createState() => _PasswordBookPageState();
+  State<CheckinPage> createState() => _CheckinPageState();
 }
 
-class _PasswordBookPageState extends State<PasswordBookPage> {
-  late Box<PasswordItem> _box;
+class _CheckinPageState extends State<CheckinPage> {
+  late Box<CheckinItem> _box;
 
   @override
   void initState() {
     super.initState();
-    _box = Hive.box<PasswordItem>('passwords');
+    _box = Hive.box<CheckinItem>('checkins');
   }
 
-  void _addOrEditPassword({PasswordItem? item, int? index}) async {
-    final result = await showDialog<PasswordItem>(
+  void _addOrEditCheckin({CheckinItem? item, int? index}) async {
+    final result = await showDialog<CheckinItem>(
       context: context,
-      builder: (context) => PasswordEditDialog(item: item),
+      builder: (context) => CheckinEditDialog(item: item),
     );
     if (result != null) {
       if (item == null) {
@@ -34,9 +34,20 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
     }
   }
 
-  void _deletePassword(int index) async {
+  void _deleteCheckin(int index) async {
     await _box.deleteAt(index);
     setState(() {});
+  }
+
+  void _doCheckin(int index) async {
+    final item = _box.getAt(index);
+    if (item == null) return;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    if (!item.history.contains(today)) {
+      item.history.add(today);
+      await item.save();
+      setState(() {});
+    }
   }
 
   @override
@@ -44,9 +55,9 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
     return Scaffold(
       body: ValueListenableBuilder(
         valueListenable: _box.listenable(),
-        builder: (context, Box<PasswordItem> box, _) {
+        builder: (context, Box<CheckinItem> box, _) {
           if (box.isEmpty) {
-            return const Center(child: Text('暂无密码，点击右下角添加', style: TextStyle(fontSize: 18)));
+            return const Center(child: Text('暂无打卡项目，点击右下角添加', style: TextStyle(fontSize: 18)));
           }
           return GridView.builder(
             padding: const EdgeInsets.all(16),
@@ -59,13 +70,15 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
             itemCount: box.length,
             itemBuilder: (context, index) {
               final item = box.getAt(index)!;
+              final today = DateTime.now().toIso8601String().substring(0, 10);
+              final checked = item.history.contains(today);
               return GestureDetector(
-                onTap: () => _addOrEditPassword(item: item, index: index),
+                onTap: () => _addOrEditCheckin(item: item, index: index),
                 onLongPress: () async {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (_) => AlertDialog(
-                      title: const Text('删除密码'),
+                      title: const Text('删除打卡'),
                       content: Text('确定要删除"${item.title}"吗？'),
                       actions: [
                         TextButton(
@@ -79,9 +92,10 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
                       ],
                     ),
                   );
-                  if (confirm == true) _deletePassword(index);
+                  if (confirm == true) _deleteCheckin(index);
                 },
                 child: Card(
+                  color: checked ? Colors.green[50] : Colors.white,
                   elevation: 4,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   child: Padding(
@@ -100,13 +114,21 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const Icon(Icons.lock, color: Colors.deepPurple, size: 28),
+                            IconButton(
+                              icon: Icon(
+                                checked ? Icons.check_circle : Icons.radio_button_unchecked,
+                                color: checked ? Colors.green : Colors.grey,
+                                size: 32,
+                              ),
+                              onPressed: checked ? null : () => _doCheckin(index),
+                              tooltip: checked ? '今日已打卡' : '打卡',
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text('账号: ${item.username}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text('类型: ${_typeText(item.type)}'),
                         const Spacer(),
-                        Text('备注: ${item.notes}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                        Text('已打卡: ${item.history.length}天', style: const TextStyle(fontSize: 14, color: Colors.grey)),
                       ],
                     ),
                   ),
@@ -117,70 +139,73 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _addOrEditPassword(),
+        onPressed: () => _addOrEditCheckin(),
         child: const Icon(Icons.add),
-        tooltip: '添加密码',
+        tooltip: '添加打卡',
       ),
     );
   }
+
+  String _typeText(String type) {
+    switch (type) {
+      case 'daily':
+        return '每日';
+      case 'weekly':
+        return '每周';
+      case 'monthly':
+        return '每月';
+      default:
+        return type;
+    }
+  }
 }
 
-class PasswordEditDialog extends StatefulWidget {
-  final PasswordItem? item;
-  const PasswordEditDialog({super.key, this.item});
+class CheckinEditDialog extends StatefulWidget {
+  final CheckinItem? item;
+  const CheckinEditDialog({super.key, this.item});
 
   @override
-  State<PasswordEditDialog> createState() => _PasswordEditDialogState();
+  State<CheckinEditDialog> createState() => _CheckinEditDialogState();
 }
 
-class _PasswordEditDialogState extends State<PasswordEditDialog> {
+class _CheckinEditDialogState extends State<CheckinEditDialog> {
   late TextEditingController _titleController;
-  late TextEditingController _usernameController;
-  late TextEditingController _passwordController;
-  late TextEditingController _notesController;
+  String _type = 'daily';
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.item?.title ?? '');
-    _usernameController = TextEditingController(text: widget.item?.username ?? '');
-    _passwordController = TextEditingController(text: widget.item?.password ?? '');
-    _notesController = TextEditingController(text: widget.item?.notes ?? '');
+    _type = widget.item?.type ?? 'daily';
   }
 
   @override
   void dispose() {
     _titleController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
-    _notesController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.item == null ? '添加密码' : '编辑密码'),
+      title: Text(widget.item == null ? '添加打卡' : '编辑打卡'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(labelText: '标题'),
+              decoration: const InputDecoration(labelText: '打卡内容'),
             ),
-            TextField(
-              controller: _usernameController,
-              decoration: const InputDecoration(labelText: '账号'),
-            ),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: '密码'),
-              obscureText: true,
-            ),
-            TextField(
-              controller: _notesController,
-              decoration: const InputDecoration(labelText: '备注'),
+            DropdownButtonFormField<String>(
+              value: _type,
+              items: const [
+                DropdownMenuItem(value: 'daily', child: Text('每日')),
+                DropdownMenuItem(value: 'weekly', child: Text('每周')),
+                DropdownMenuItem(value: 'monthly', child: Text('每月')),
+              ],
+              onChanged: (v) => setState(() => _type = v ?? 'daily'),
+              decoration: const InputDecoration(labelText: '打卡类型'),
             ),
           ],
         ),
@@ -195,11 +220,10 @@ class _PasswordEditDialogState extends State<PasswordEditDialog> {
             if (_titleController.text.trim().isEmpty) return;
             Navigator.pop(
               context,
-              PasswordItem(
+              CheckinItem(
                 title: _titleController.text.trim(),
-                username: _usernameController.text.trim(),
-                password: _passwordController.text.trim(),
-                notes: _notesController.text.trim(),
+                type: _type,
+                history: widget.item?.history ?? [],
               ),
             );
           },

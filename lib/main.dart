@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'modules/password/password_book_page.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'modules/password/password_item.dart';
+import 'modules/checkin/checkin_page.dart';
+import 'modules/checkin/checkin_item.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   Hive.registerAdapter(PasswordItemAdapter());
+  Hive.registerAdapter(CheckinItemAdapter());
   await Hive.openBox<PasswordItem>('passwords');
+  await Hive.openBox<CheckinItem>('checkins');
   runApp(const MyApp());
 }
 
@@ -41,6 +45,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   final List<Widget> _pages = [
     const HomePage(),
     const PasswordBookPage(),
+    const CheckinPage(),
     // 其他模块页可继续添加
   ];
 
@@ -78,6 +83,17 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.check_circle),
+            title: const Text('打卡'),
+            selected: _selectedIndex == 2,
+            onTap: () {
+              setState(() {
+                _selectedIndex = 2;
+              });
+              Navigator.pop(context);
+            },
+          ),
           // 其他模块入口可继续添加
         ],
       ),
@@ -101,7 +117,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : ''),
+          title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : _selectedIndex == 2 ? '打卡' : ''),
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
         drawer: _buildDrawer(),
@@ -125,6 +141,7 @@ class HomePage extends StatelessWidget {
         mainAxisSpacing: 16,
         children: [
           _buildModuleCard(context, Icons.lock, '密码本', 1),
+          _buildModuleCard(context, Icons.check_circle, '打卡', 2),
           // 其他功能卡片可继续添加
         ],
       ),
