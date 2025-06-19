@@ -1,29 +1,34 @@
+import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'password_item.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'item.dart';
 import '../../modules/log/log_service.dart';
 
-class PasswordBookPage extends StatefulWidget {
-  const PasswordBookPage({super.key});
+class ItemPage extends StatefulWidget {
+  const ItemPage({super.key});
 
   @override
-  State<PasswordBookPage> createState() => _PasswordBookPageState();
+  State<ItemPage> createState() => _ItemPageState();
 }
 
-class _PasswordBookPageState extends State<PasswordBookPage> {
-  late Box<PasswordItem> _box;
+class _ItemPageState extends State<ItemPage> {
+  late Box<Item> _box;
+  final List<String> _tags = ['家居', '娱乐', '办公', '学习', '运动', '其他'];
 
   @override
   void initState() {
     super.initState();
-    _box = Hive.box<PasswordItem>('passwords');
+    _box = Hive.box<Item>('items');
   }
 
-  void _addOrEditPassword({PasswordItem? item, int? index}) async {
-    final result = await showDialog<PasswordItem>(
+  void _addOrEditItem({Item? item, int? index}) async {
+    final result = await showDialog<Item>(
       context: context,
-      builder: (context) => PasswordEditDialog(item: item),
+      builder: (context) => ItemEditDialog(item: item, tags: _tags),
     );
     if (result != null) {
       if (item == null) {
@@ -35,9 +40,15 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
     }
   }
 
-  void _deletePassword(int index) async {
+  void _deleteItem(int index) async {
     await _box.deleteAt(index);
     setState(() {});
+  }
+
+  String _formatPrice(double price) {
+    // 截断到两位小数
+    int p = (price * 100).truncate();
+    return (p / 100).toStringAsFixed(2);
   }
 
   @override
@@ -46,9 +57,9 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
       return Scaffold(
         body: ValueListenableBuilder(
           valueListenable: _box.listenable(),
-          builder: (context, Box<PasswordItem> box, _) {
+          builder: (context, Box<Item> box, _) {
             if (box.isEmpty) {
-              return const Center(child: Text('暂无密码，点击右下角添加', style: TextStyle(fontSize: 18)));
+              return const Center(child: Text('暂无物品，点击右下角添加', style: TextStyle(fontSize: 18)));
             }
             return GridView.builder(
               padding: const EdgeInsets.all(16),
@@ -56,19 +67,19 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 1.2,
+                childAspectRatio: 0.85,
               ),
               itemCount: box.length,
               itemBuilder: (context, index) {
                 final item = box.getAt(index)!;
                 return GestureDetector(
-                  onTap: () => _addOrEditPassword(item: item, index: index),
+                  onTap: () => _addOrEditItem(item: item, index: index),
                   onLongPress: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (_) => AlertDialog(
-                        title: const Text('删除密码'),
-                        content: Text('确定要删除"${item.title}"吗？'),
+                        title: const Text('删除物品'),
+                        content: Text('确定要删除"${item.name}"吗？'),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context, false),
@@ -81,34 +92,20 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
                         ],
                       ),
                     );
-                    if (confirm == true) _deletePassword(index);
+                    if (confirm == true) _deleteItem(index);
                   },
                   child: Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(12.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  item.title,
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const Icon(Icons.lock, color: Colors.deepPurple, size: 28),
-                            ],
-                          ),
                           const SizedBox(height: 8),
-                          Text('账号: ${item.username}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                          const Spacer(),
-                          Text('备注: ${item.notes}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                          Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text('标签: ${item.tag}', style: const TextStyle(fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text('价格: ¥${_formatPrice(item.price)}', style: const TextStyle(fontSize: 14)),
                         ],
                       ),
                     ),
@@ -119,46 +116,46 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
           },
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: () => _addOrEditPassword(),
+          onPressed: () => _addOrEditItem(),
           child: const Icon(Icons.add),
-          tooltip: '添加密码',
+          tooltip: '添加物品',
         ),
       );
     } catch (e, s) {
-      LogService.addError('密码本页面构建异常: $e\n$s');
+      LogService.addError('物品管理页面构建异常: $e\n$s');
       return const Center(child: Text('页面出错，详情见日志'));
     }
   }
 }
 
-class PasswordEditDialog extends StatefulWidget {
-  final PasswordItem? item;
-  const PasswordEditDialog({super.key, this.item});
+class ItemEditDialog extends StatefulWidget {
+  final Item? item;
+  final List<String> tags;
+  const ItemEditDialog({super.key, this.item, required this.tags});
 
   @override
-  State<PasswordEditDialog> createState() => _PasswordEditDialogState();
+  State<ItemEditDialog> createState() => _ItemEditDialogState();
 }
 
-class _PasswordEditDialogState extends State<PasswordEditDialog> {
-  late TextEditingController _titleController;
-  late TextEditingController _usernameController;
-  late TextEditingController _passwordController;
+class _ItemEditDialogState extends State<ItemEditDialog> {
+  late TextEditingController _nameController;
+  late TextEditingController _priceController;
   late TextEditingController _notesController;
+  String _tag = '';
 
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.item?.title ?? '');
-    _usernameController = TextEditingController(text: widget.item?.username ?? '');
-    _passwordController = TextEditingController(text: widget.item?.password ?? '');
+    _nameController = TextEditingController(text: widget.item?.name ?? '');
+    _priceController = TextEditingController(text: widget.item?.price.toString() ?? '');
     _notesController = TextEditingController(text: widget.item?.notes ?? '');
+    _tag = widget.item?.tag ?? widget.tags.first;
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _nameController.dispose();
+    _priceController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -166,23 +163,25 @@ class _PasswordEditDialogState extends State<PasswordEditDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.item == null ? '添加密码' : '编辑密码'),
+      title: Text(widget.item == null ? '添加物品' : '编辑物品'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: '标题'),
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: '物品名称'),
+            ),
+            DropdownButtonFormField<String>(
+              value: _tag,
+              items: widget.tags.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+              onChanged: (v) => setState(() => _tag = v ?? widget.tags.first),
+              decoration: const InputDecoration(labelText: '标签'),
             ),
             TextField(
-              controller: _usernameController,
-              decoration: const InputDecoration(labelText: '账号'),
-            ),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: '密码'),
-              obscureText: true,
+              controller: _priceController,
+              decoration: const InputDecoration(labelText: '价格'),
+              keyboardType: TextInputType.numberWithOptions(decimal: true),
             ),
             TextField(
               controller: _notesController,
@@ -198,14 +197,15 @@ class _PasswordEditDialogState extends State<PasswordEditDialog> {
         ),
         ElevatedButton(
           onPressed: () {
-            if (_titleController.text.trim().isEmpty) return;
+            if (_nameController.text.trim().isEmpty) return;
             Navigator.pop(
               context,
-              PasswordItem(
-                title: _titleController.text.trim(),
-                username: _usernameController.text.trim(),
-                password: _passwordController.text.trim(),
+              Item(
+                name: _nameController.text.trim(),
+                tag: _tag,
+                price: double.tryParse(_priceController.text.trim()) ?? 0.0,
                 notes: _notesController.text.trim(),
+                imagePath: null,
               ),
             );
           },

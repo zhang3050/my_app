@@ -4,14 +4,19 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'modules/password/password_item.dart';
 import 'modules/checkin/checkin_page.dart';
 import 'modules/checkin/checkin_item.dart';
+import 'modules/item/item_page.dart';
+import 'modules/item/item.dart';
+import 'modules/log/log_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   Hive.registerAdapter(PasswordItemAdapter());
   Hive.registerAdapter(CheckinItemAdapter());
+  Hive.registerAdapter(ItemAdapter());
   await Hive.openBox<PasswordItem>('passwords');
   await Hive.openBox<CheckinItem>('checkins');
+  await Hive.openBox<Item>('items');
   runApp(const MyApp());
 }
 
@@ -46,6 +51,8 @@ class _MainScaffoldState extends State<MainScaffold> {
     const HomePage(),
     const PasswordBookPage(),
     const CheckinPage(),
+    const ItemPage(),
+    const LogPage(),
     // 其他模块页可继续添加
   ];
 
@@ -94,6 +101,28 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.inventory),
+            title: const Text('物品管理'),
+            selected: _selectedIndex == 3,
+            onTap: () {
+              setState(() {
+                _selectedIndex = 3;
+              });
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.bug_report),
+            title: const Text('日志'),
+            selected: _selectedIndex == 4,
+            onTap: () {
+              setState(() {
+                _selectedIndex = 4;
+              });
+              Navigator.pop(context);
+            },
+          ),
           // 其他模块入口可继续添加
         ],
       ),
@@ -117,7 +146,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : _selectedIndex == 2 ? '打卡' : ''),
+          title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : _selectedIndex == 2 ? '打卡' : _selectedIndex == 3 ? '物品管理' : _selectedIndex == 4 ? '日志' : ''),
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
         drawer: _buildDrawer(),
@@ -142,6 +171,8 @@ class HomePage extends StatelessWidget {
         children: [
           _buildModuleCard(context, Icons.lock, '密码本', 1),
           _buildModuleCard(context, Icons.check_circle, '打卡', 2),
+          _buildModuleCard(context, Icons.inventory, '物品管理', 3),
+          _buildModuleCard(context, Icons.bug_report, '日志', 4),
           // 其他功能卡片可继续添加
         ],
       ),
