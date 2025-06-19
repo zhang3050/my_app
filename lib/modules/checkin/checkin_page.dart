@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'checkin_item.dart';
 import '../../modules/log/log_service.dart';
+import 'dart:async';
 
 class CheckinPage extends StatefulWidget {
   const CheckinPage({super.key});
@@ -13,11 +14,68 @@ class CheckinPage extends StatefulWidget {
 
 class _CheckinPageState extends State<CheckinPage> {
   late Box<CheckinItem> _box;
+  Timer? _midnightTimer;
+  String _filterType = 'all';
+  final List<Map<String, String>> _typeTabs = [
+    {'label': '全部', 'value': 'all'},
+    {'label': '每日', 'value': 'daily'},
+    {'label': '每周', 'value': 'weekly'},
+    {'label': '每月', 'value': 'monthly'},
+  ];
 
   @override
   void initState() {
     super.initState();
     _box = Hive.box<CheckinItem>('checkins');
+    _scheduleMidnightReset();
+  }
+
+  @override
+  void dispose() {
+    _midnightTimer?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleMidnightReset() {
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    final duration = nextMidnight.difference(now);
+    _midnightTimer = Timer(duration, () {
+      _resetCheckinsForNewDay();
+      _scheduleMidnightReset();
+    });
+  }
+
+  void _resetCheckinsForNewDay() async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    for (int i = 0; i < _box.length; i++) {
+      final item = _box.getAt(i);
+      if (item == null) continue;
+      // 统计实际打卡天数
+      int targetDays = 0;
+      switch (item.type) {
+        case 'daily':
+          targetDays = 1;
+          break;
+        case 'weekly':
+          targetDays = 7;
+          break;
+        case 'monthly':
+          targetDays = 30;
+          break;
+        default:
+          targetDays = 1;
+      }
+      // 如果已达目标天数，不再重置
+      if (item.history.length >= targetDays) continue;
+      // 如果今天未打卡，移除今天的打卡状态（即重置）
+      if (item.history.contains(today)) {
+        // do nothing
+      } else {
+        // 只需setState触发UI刷新即可，实际打卡状态由history决定
+      }
+    }
+    setState(() {});
   }
 
   void _addOrEditCheckin({CheckinItem? item, int? index}) async {
@@ -40,25 +98,60 @@ class _CheckinPageState extends State<CheckinPage> {
     setState(() {});
   }
 
-  void _doCheckin(int index) async {
+  void _toggleCheckin(int index) async {
     final item = _box.getAt(index);
     if (item == null) return;
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    if (!item.history.contains(today)) {
+    if (item.history.contains(today)) {
+      item.history.remove(today);
+    } else {
       item.history.add(today);
-      await item.save();
-      setState(() {});
     }
+    await item.save();
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     try {
       return Scaffold(
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Row(
+            children: _typeTabs.map((tab) {
+              final selected = _filterType == tab['value'];
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _filterType = tab['value']!),
+                  child: Container(
+                    color: selected ? Colors.blue[100] : Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: Text(tab['label']!, style: TextStyle(color: selected ? Colors.blue : Colors.black)),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
         body: ValueListenableBuilder(
           valueListenable: _box.listenable(),
           builder: (context, Box<CheckinItem> box, _) {
-            if (box.isEmpty) {
+            List<CheckinItem> items = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
+            // 标签筛选
+            if (_filterType != 'all') {
+              items = items.where((e) => e.type == _filterType).toList();
+            }
+            // 排序：未打卡的在前，已打卡的在后
+            final today = DateTime.now().toIso8601String().substring(0, 10);
+            items.sort((a, b) {
+              final aChecked = a.history.contains(today);
+              final bChecked = b.history.contains(today);
+              if (aChecked == bChecked) return 0;
+              return aChecked ? 1 : -1;
+            });
+            if (items.isEmpty) {
               return const Center(child: Text('暂无打卡项目，点击右下角添加', style: TextStyle(fontSize: 18)));
             }
             return GridView.builder(
@@ -69,13 +162,12 @@ class _CheckinPageState extends State<CheckinPage> {
                 mainAxisSpacing: 16,
                 childAspectRatio: 1.2,
               ),
-              itemCount: box.length,
+              itemCount: items.length,
               itemBuilder: (context, index) {
-                final item = box.getAt(index)!;
-                final today = DateTime.now().toIso8601String().substring(0, 10);
+                final item = items[index];
                 final checked = item.history.contains(today);
                 return GestureDetector(
-                  onTap: () => _addOrEditCheckin(item: item, index: index),
+                  onTap: () => _addOrEditCheckin(item: item, index: _box.values.toList().indexOf(item)),
                   onLongPress: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
@@ -94,10 +186,12 @@ class _CheckinPageState extends State<CheckinPage> {
                         ],
                       ),
                     );
-                    if (confirm == true) _deleteCheckin(index);
+                    if (confirm == true) _deleteCheckin(_box.values.toList().indexOf(item));
                   },
                   child: Card(
-                    color: checked ? Colors.green[50] : Colors.white,
+                    color: checked
+                        ? Colors.grey[300]
+                        : Colors.lightBlue[100],
                     elevation: 4,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: Padding(
@@ -122,15 +216,15 @@ class _CheckinPageState extends State<CheckinPage> {
                                   color: checked ? Colors.green : Colors.grey,
                                   size: 32,
                                 ),
-                                onPressed: checked ? null : () => _doCheckin(index),
-                                tooltip: checked ? '今日已打卡' : '打卡',
+                                onPressed: () => _showCheckinDialog(item, _box.values.toList().indexOf(item), checked),
+                                tooltip: checked ? '取消今日打卡/补打卡' : '打卡/补打卡',
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           Text('类型: ${_typeText(item.type)}', maxLines: 1, overflow: TextOverflow.ellipsis),
                           const Spacer(),
-                          Text('已打卡: ${item.history.length}天', style: const TextStyle(fontSize: 14, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text('已打卡: ${_getCheckinDays(item)}天', style: const TextStyle(fontSize: 14, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),
@@ -152,6 +246,84 @@ class _CheckinPageState extends State<CheckinPage> {
     }
   }
 
+  void _showCheckinDialog(CheckinItem item, int index, bool checked) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    if (item.type == 'daily') {
+      // 每日类型直接切换打卡状态
+      if (item.history.contains(today)) {
+        item.history.remove(today);
+      } else {
+        item.history.add(today);
+      }
+      await item.save();
+      setState(() {});
+      return;
+    }
+    final List<String> days = _getMonthDays();
+    try {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(checked ? '取消/补打卡' : '打卡/补打卡'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ...days.map((d) => ListTile(
+                        title: Text(
+                          d == today ? '今天' : d,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: item.history.contains(d)
+                            ? const Icon(Icons.check_circle, color: Colors.green)
+                            : const Icon(Icons.radio_button_unchecked, color: Colors.grey),
+                        onTap: () async {
+                          if (item.history.contains(d)) {
+                            item.history.remove(d);
+                          } else {
+                            item.history.add(d);
+                          }
+                          await item.save();
+                          setState(() {});
+                          Navigator.pop(context);
+                        },
+                      )),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+      );
+    } catch (e, s) {
+      LogService.addError('补打卡弹窗异常: $e\n$s\nitem: ${item.title}, type: ${item.type}');
+      debugPrint('补打卡弹窗异常: $e\n$s\nitem: ${item.title}, type: ${item.type}');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('补打卡弹窗异常，详情见日志')));
+      }
+    }
+  }
+
+  List<String> _getMonthDays() {
+    final now = DateTime.now();
+    final days = <String>[];
+    final firstDay = DateTime(now.year, now.month, 1);
+    final lastDay = DateTime(now.year, now.month + 1, 0);
+    for (int i = 0; i < lastDay.day; i++) {
+      final d = firstDay.add(Duration(days: i));
+      days.add(d.toIso8601String().substring(0, 10));
+    }
+    return days;
+  }
+
   String _typeText(String type) {
     switch (type) {
       case 'daily':
@@ -163,6 +335,11 @@ class _CheckinPageState extends State<CheckinPage> {
       default:
         return type;
     }
+  }
+
+  int _getCheckinDays(CheckinItem item) {
+    // 只统计实际打卡天数
+    return item.history.length;
   }
 }
 
