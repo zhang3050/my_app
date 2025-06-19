@@ -11,18 +11,24 @@ import 'package:hive/hive.dart';
 import 'package:reorderables/reorderables.dart';
 
 void main() async {
+  // 初始化Flutter绑定，确保所有插件可用
   WidgetsFlutterBinding.ensureInitialized();
+  // 初始化Hive本地数据库
   await Hive.initFlutter();
+  // 注册各模块的数据模型适配器
   Hive.registerAdapter(PasswordItemAdapter());
   Hive.registerAdapter(CheckinItemAdapter());
   Hive.registerAdapter(ItemAdapter());
+  // 打开各模块的数据盒子（本地持久化）
   await Hive.openBox<PasswordItem>('passwords');
   await Hive.openBox<CheckinItem>('checkins');
   await Hive.openBox<Item>('items');
   await Hive.openBox('main_sort');
+  // 启动应用
   runApp(const MyApp());
 }
 
+/// 应用根组件，配置主题与首页
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -47,9 +53,9 @@ class MainScaffold extends StatefulWidget {
 }
 
 class _MainScaffoldState extends State<MainScaffold> {
-  int _selectedIndex = 0; // 0:首页 1:密码本 ...
-  late List<_ModuleCardInfo> _moduleCards;
-  late Box box;
+  int _selectedIndex = 0; // 当前选中的页面索引，0为首页
+  late List<_ModuleCardInfo> _moduleCards; // 首页卡片信息
+  late Box box; // Hive盒子用于保存首页卡片顺序
 
   @override
   void initState() {
@@ -58,6 +64,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     _moduleCards = _loadModuleCards();
   }
 
+  /// 加载首页卡片顺序，若无则用默认顺序
   List<_ModuleCardInfo> _loadModuleCards() {
     final defaultCards = [
       _ModuleCardInfo(icon: Icons.lock, title: '密码本', pageIndex: 1),
@@ -82,10 +89,12 @@ class _MainScaffoldState extends State<MainScaffold> {
     return defaultCards;
   }
 
+  /// 保存首页卡片顺序到本地
   void _saveModuleCards() {
     box.put('cards', _moduleCards.map((e) => e.toMap()).toList());
   }
 
+  /// 各功能页面列表，按索引切换
   List<Widget> get _pages => [
     HomePage(
       moduleCards: _moduleCards,
@@ -102,7 +111,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     const LogPage(),
   ];
 
-  // 侧边导航栏
+  /// 构建侧边导航栏
   Drawer _buildDrawer() {
     return Drawer(
       child: ListView(
@@ -114,6 +123,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             ),
             child: Text('习惯记忆合集', style: TextStyle(color: Colors.white, fontSize: 24)),
           ),
+          // 首页入口
           ListTile(
             leading: const Icon(Icons.home),
             title: const Text('首页'),
@@ -125,6 +135,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
+          // 密码本入口
           ListTile(
             leading: const Icon(Icons.lock),
             title: const Text('密码本'),
@@ -136,6 +147,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
+          // 打卡入口
           ListTile(
             leading: const Icon(Icons.check_circle),
             title: const Text('打卡'),
@@ -147,6 +159,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
+          // 物品管理入口
           ListTile(
             leading: const Icon(Icons.inventory),
             title: const Text('物品管理'),
@@ -158,6 +171,7 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
+          // 日志入口
           ListTile(
             leading: const Icon(Icons.bug_report),
             title: const Text('日志'),
@@ -175,7 +189,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     );
   }
 
-  // 返回键逻辑
+  /// 返回键逻辑：模块页返回首页，首页返回退出APP
   Future<bool> _onWillPop() async {
     if (_selectedIndex != 0) {
       setState(() {
@@ -192,6 +206,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
+          // 动态标题
           title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : _selectedIndex == 2 ? '打卡' : _selectedIndex == 3 ? '物品管理' : _selectedIndex == 4 ? '日志' : ''),
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
@@ -202,7 +217,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   }
 }
 
-// 首页：卡片式功能入口
+/// 首页：卡片式功能入口，支持拖拽排序
 class HomePage extends StatefulWidget {
   final List<_ModuleCardInfo> moduleCards;
   final void Function(List<_ModuleCardInfo>) onSort;
@@ -237,6 +252,7 @@ class _HomePageState extends State<HomePage> {
               for (final card in _cards)
                 _buildModuleCard(context, card.icon, card.title, card.pageIndex, key: ValueKey(card.title)),
             ],
+            // 拖拽排序回调
             onReorder: (oldIndex, newIndex) {
               setState(() {
                 final item = _cards.removeAt(oldIndex);
@@ -250,11 +266,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// 构建首页功能卡片
   Widget _buildModuleCard(BuildContext context, IconData icon, String title, int pageIndex, {Key? key}) {
     final double cardWidth = (MediaQuery.of(context).size.width - 16 * 3) / 2; // 16*3: 两边padding+中间间距
     return GestureDetector(
       key: key,
       onTap: () {
+        // 跳转到对应模块
         final state = context.findAncestorStateOfType<_MainScaffoldState>();
         state?.setState(() {
           state._selectedIndex = pageIndex;
@@ -281,6 +299,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+/// 首页卡片信息结构体
 class _ModuleCardInfo {
   final IconData icon;
   final String title;

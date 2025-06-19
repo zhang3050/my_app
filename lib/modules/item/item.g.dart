@@ -6,6 +6,9 @@ part of 'item.dart';
 // TypeAdapterGenerator
 // **************************************************************************
 
+// item.g.dart
+// Hive自动生成的Item适配器代码，用于本地序列化/反序列化
+
 class ItemAdapter extends TypeAdapter<Item> {
   @override
   final int typeId = 2;

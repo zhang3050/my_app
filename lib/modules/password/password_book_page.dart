@@ -12,14 +12,15 @@ class PasswordBookPage extends StatefulWidget {
 }
 
 class _PasswordBookPageState extends State<PasswordBookPage> {
-  late Box<PasswordItem> _box;
+  late Box<PasswordItem> _box; // Hive盒子，存储所有密码项
 
   @override
   void initState() {
     super.initState();
-    _box = Hive.box<PasswordItem>('passwords');
+    _box = Hive.box<PasswordItem>('passwords'); // 获取密码本数据盒子
   }
 
+  /// 添加或编辑密码项，弹窗输入
   void _addOrEditPassword({PasswordItem? item, int? index}) async {
     final result = await showDialog<PasswordItem>(
       context: context,
@@ -27,14 +28,15 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
     );
     if (result != null) {
       if (item == null) {
-        await _box.add(result);
+        await _box.add(result); // 新增
       } else if (index != null) {
-        await _box.putAt(index, result);
+        await _box.putAt(index, result); // 编辑
       }
       setState(() {});
     }
   }
 
+  /// 删除密码项，长按卡片触发
   void _deletePassword(int index) async {
     await _box.deleteAt(index);
     setState(() {});
@@ -62,7 +64,7 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
               itemBuilder: (context, index) {
                 final item = box.getAt(index)!;
                 return GestureDetector(
-                  onTap: () => _addOrEditPassword(item: item, index: index),
+                  onTap: () => _addOrEditPassword(item: item, index: index), // 点击编辑
                   onLongPress: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
@@ -128,12 +130,14 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
         ),
       );
     } catch (e, s) {
+      // 捕获异常并写入日志
       LogService.addError('密码本页面构建异常: $e\n$s');
       return const Center(child: Text('页面出错，详情见日志'));
     }
   }
 }
 
+/// 密码编辑弹窗，支持新增和编辑
 class PasswordEditDialog extends StatefulWidget {
   final PasswordItem? item;
   const PasswordEditDialog({super.key, this.item});

@@ -13,9 +13,9 @@ class CheckinPage extends StatefulWidget {
 }
 
 class _CheckinPageState extends State<CheckinPage> {
-  late Box<CheckinItem> _box;
-  Timer? _midnightTimer;
-  String _filterType = 'all';
+  late Box<CheckinItem> _box; // Hive盒子，存储所有打卡项
+  Timer? _midnightTimer; // 用于自动重置的定时器
+  String _filterType = 'all'; // 当前筛选类型
   final List<Map<String, String>> _typeTabs = [
     {'label': '全部', 'value': 'all'},
     {'label': '每日', 'value': 'daily'},
@@ -26,8 +26,8 @@ class _CheckinPageState extends State<CheckinPage> {
   @override
   void initState() {
     super.initState();
-    _box = Hive.box<CheckinItem>('checkins');
-    _scheduleMidnightReset();
+    _box = Hive.box<CheckinItem>('checkins'); // 获取打卡数据盒子
+    _scheduleMidnightReset(); // 启动自动重置
   }
 
   @override
@@ -36,6 +36,7 @@ class _CheckinPageState extends State<CheckinPage> {
     super.dispose();
   }
 
+  /// 定时器：每天零点自动重置打卡状态
   void _scheduleMidnightReset() {
     final now = DateTime.now();
     final nextMidnight = DateTime(now.year, now.month, now.day + 1);
@@ -46,6 +47,7 @@ class _CheckinPageState extends State<CheckinPage> {
     });
   }
 
+  /// 重置所有打卡项的今日状态
   void _resetCheckinsForNewDay() async {
     final today = DateTime.now().toIso8601String().substring(0, 10);
     for (int i = 0; i < _box.length; i++) {
@@ -68,16 +70,17 @@ class _CheckinPageState extends State<CheckinPage> {
       }
       // 如果已达目标天数，不再重置
       if (item.history.length >= targetDays) continue;
-      // 如果今天未打卡，移除今天的打卡状态（即重置）
+      // 如果今天未打卡，仅刷新UI即可
       if (item.history.contains(today)) {
         // do nothing
       } else {
-        // 只需setState触发UI刷新即可，实际打卡状态由history决定
+        // 只需setState触发UI刷新，实际打卡状态由history决定
       }
     }
     setState(() {});
   }
 
+  /// 添加或编辑打卡项，弹窗输入
   void _addOrEditCheckin({CheckinItem? item, int? index}) async {
     final result = await showDialog<CheckinItem>(
       context: context,
@@ -85,19 +88,21 @@ class _CheckinPageState extends State<CheckinPage> {
     );
     if (result != null) {
       if (item == null) {
-        await _box.add(result);
+        await _box.add(result); // 新增
       } else if (index != null) {
-        await _box.putAt(index, result);
+        await _box.putAt(index, result); // 编辑
       }
       setState(() {});
     }
   }
 
+  /// 删除打卡项，长按卡片触发
   void _deleteCheckin(int index) async {
     await _box.deleteAt(index);
     setState(() {});
   }
 
+  /// 切换打卡/取消打卡状态
   void _toggleCheckin(int index) async {
     final item = _box.getAt(index);
     if (item == null) return;
@@ -167,7 +172,7 @@ class _CheckinPageState extends State<CheckinPage> {
                 final checked = item.history.contains(today);
                 return IntrinsicHeight(
                   child: GestureDetector(
-                    onTap: () => _addOrEditCheckin(item: item, index: _box.values.toList().indexOf(item)),
+                    onTap: () => _addOrEditCheckin(item: item, index: _box.values.toList().indexOf(item)), // 点击编辑
                     onLongPress: () async {
                       final confirm = await showDialog<bool>(
                         context: context,
@@ -246,6 +251,7 @@ class _CheckinPageState extends State<CheckinPage> {
         ),
       );
     } catch (e, s) {
+      // 捕获异常并写入日志
       LogService.addError('打卡页面构建异常: $e\n$s');
       return const Center(child: Text('页面出错，详情见日志'));
     }

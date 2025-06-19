@@ -4,14 +4,15 @@ part 'password_item.g.dart';
 @HiveType(typeId: 0)
 class PasswordItem extends HiveObject {
   @HiveField(0)
-  String title;
+  String title; // 密码项标题
   @HiveField(1)
-  String username;
+  String username; // 账号
   @HiveField(2)
-  String password;
+  String password; // 密码内容
   @HiveField(3)
-  String notes;
+  String notes; // 备注
 
+  /// 构造函数
   PasswordItem({
     required this.title,
     required this.username,

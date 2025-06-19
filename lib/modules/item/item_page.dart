@@ -16,15 +16,16 @@ class ItemPage extends StatefulWidget {
 }
 
 class _ItemPageState extends State<ItemPage> {
-  late Box<Item> _box;
-  final List<String> _tags = ['家居', '娱乐', '办公', '学习', '运动', '其他'];
+  late Box<Item> _box; // Hive盒子，存储所有物品项
+  final List<String> _tags = ['家居', '娱乐', '办公', '学习', '运动', '其他']; // 预设标签
 
   @override
   void initState() {
     super.initState();
-    _box = Hive.box<Item>('items');
+    _box = Hive.box<Item>('items'); // 获取物品数据盒子
   }
 
+  /// 添加或编辑物品项，弹窗输入
   void _addOrEditItem({Item? item, int? index}) async {
     final result = await showDialog<Item>(
       context: context,
@@ -32,21 +33,22 @@ class _ItemPageState extends State<ItemPage> {
     );
     if (result != null) {
       if (item == null) {
-        await _box.add(result);
+        await _box.add(result); // 新增
       } else if (index != null) {
-        await _box.putAt(index, result);
+        await _box.putAt(index, result); // 编辑
       }
       setState(() {});
     }
   }
 
+  /// 删除物品项，长按卡片触发
   void _deleteItem(int index) async {
     await _box.deleteAt(index);
     setState(() {});
   }
 
+  /// 价格格式化，保留两位小数
   String _formatPrice(double price) {
-    // 截断到两位小数
     int p = (price * 100).truncate();
     return (p / 100).toStringAsFixed(2);
   }
@@ -73,7 +75,7 @@ class _ItemPageState extends State<ItemPage> {
               itemBuilder: (context, index) {
                 final item = box.getAt(index)!;
                 return GestureDetector(
-                  onTap: () => _addOrEditItem(item: item, index: index),
+                  onTap: () => _addOrEditItem(item: item, index: index), // 点击编辑
                   onLongPress: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
@@ -126,12 +128,14 @@ class _ItemPageState extends State<ItemPage> {
         ),
       );
     } catch (e, s) {
+      // 捕获异常并写入日志
       LogService.addError('物品管理页面构建异常: $e\n$s');
       return const Center(child: Text('页面出错，详情见日志'));
     }
   }
 }
 
+/// 物品编辑弹窗，支持新增和编辑
 class ItemEditDialog extends StatefulWidget {
   final Item? item;
   final List<String> tags;

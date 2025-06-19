@@ -4,16 +4,17 @@ part 'item.g.dart';
 @HiveType(typeId: 2)
 class Item extends HiveObject {
   @HiveField(0)
-  String name;
+  String name; // 物品名称
   @HiveField(1)
-  String tag;
+  String tag; // 物品标签
   @HiveField(2)
-  double price;
+  double price; // 物品价格
   @HiveField(3)
-  String notes;
+  String notes; // 备注
   @HiveField(4)
-  String? imagePath;
+  String? imagePath; // 图片路径（已弃用，兼容保留）
 
+  /// 构造函数
   Item({
     required this.name,
     required this.tag,
