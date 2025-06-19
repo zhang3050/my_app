@@ -7,6 +7,8 @@ import 'modules/checkin/checkin_item.dart';
 import 'modules/item/item_page.dart';
 import 'modules/item/item.dart';
 import 'modules/log/log_page.dart';
+import 'package:hive/hive.dart';
+import 'package:reorderables/reorderables.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +19,7 @@ void main() async {
   await Hive.openBox<PasswordItem>('passwords');
   await Hive.openBox<CheckinItem>('checkins');
   await Hive.openBox<Item>('items');
+  await Hive.openBox('main_sort');
   runApp(const MyApp());
 }
 
@@ -45,15 +48,58 @@ class MainScaffold extends StatefulWidget {
 
 class _MainScaffoldState extends State<MainScaffold> {
   int _selectedIndex = 0; // 0:首页 1:密码本 ...
+  late List<_ModuleCardInfo> _moduleCards;
+  late Box box;
 
-  // 页面列表
-  final List<Widget> _pages = [
-    const HomePage(),
+  @override
+  void initState() {
+    super.initState();
+    box = Hive.box('main_sort');
+    _moduleCards = _loadModuleCards();
+  }
+
+  List<_ModuleCardInfo> _loadModuleCards() {
+    final defaultCards = [
+      _ModuleCardInfo(icon: Icons.lock, title: '密码本', pageIndex: 1),
+      _ModuleCardInfo(icon: Icons.check_circle, title: '打卡', pageIndex: 2),
+      _ModuleCardInfo(icon: Icons.inventory, title: '物品管理', pageIndex: 3),
+      _ModuleCardInfo(icon: Icons.bug_report, title: '日志', pageIndex: 4),
+    ];
+    final saved = box.get('cards');
+    if (saved is List) {
+      try {
+        // 保证所有模块都在首页，且顺序为用户自定义
+        final loaded = saved.map((e) => _ModuleCardInfo.fromMap(Map<String, dynamic>.from(e))).toList();
+        final existPages = loaded.map((e) => e.pageIndex).toSet();
+        for (final def in defaultCards) {
+          if (!existPages.contains(def.pageIndex)) {
+            loaded.add(def);
+          }
+        }
+        return loaded;
+      } catch (_) {}
+    }
+    return defaultCards;
+  }
+
+  void _saveModuleCards() {
+    box.put('cards', _moduleCards.map((e) => e.toMap()).toList());
+  }
+
+  List<Widget> get _pages => [
+    HomePage(
+      moduleCards: _moduleCards,
+      onSort: (cards) {
+        setState(() {
+          _moduleCards = List.from(cards);
+        });
+        _saveModuleCards();
+      },
+    ),
     const PasswordBookPage(),
     const CheckinPage(),
     const ItemPage(),
     const LogPage(),
-    // 其他模块页可继续添加
   ];
 
   // 侧边导航栏
@@ -157,51 +203,93 @@ class _MainScaffoldState extends State<MainScaffold> {
 }
 
 // 首页：卡片式功能入口
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+class HomePage extends StatefulWidget {
+  final List<_ModuleCardInfo> moduleCards;
+  final void Function(List<_ModuleCardInfo>) onSort;
+  const HomePage({super.key, required this.moduleCards, required this.onSort});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  late List<_ModuleCardInfo> _cards;
+
+  @override
+  void initState() {
+    super.initState();
+    _cards = List.from(widget.moduleCards);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: GridView.count(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        children: [
-          _buildModuleCard(context, Icons.lock, '密码本', 1),
-          _buildModuleCard(context, Icons.check_circle, '打卡', 2),
-          _buildModuleCard(context, Icons.inventory, '物品管理', 3),
-          _buildModuleCard(context, Icons.bug_report, '日志', 4),
-          // 其他功能卡片可继续添加
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ReorderableWrap(
+            direction: Axis.horizontal,
+            alignment: WrapAlignment.start,
+            runAlignment: WrapAlignment.start,
+            spacing: 16,
+            runSpacing: 16,
+            maxMainAxisCount: 2,
+            children: [
+              for (final card in _cards)
+                _buildModuleCard(context, card.icon, card.title, card.pageIndex, key: ValueKey(card.title)),
+            ],
+            onReorder: (oldIndex, newIndex) {
+              setState(() {
+                final item = _cards.removeAt(oldIndex);
+                _cards.insert(newIndex, item);
+              });
+              widget.onSort(_cards);
+            },
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildModuleCard(BuildContext context, IconData icon, String title, int pageIndex) {
+  Widget _buildModuleCard(BuildContext context, IconData icon, String title, int pageIndex, {Key? key}) {
+    final double cardWidth = (MediaQuery.of(context).size.width - 16 * 3) / 2; // 16*3: 两边padding+中间间距
     return GestureDetector(
+      key: key,
       onTap: () {
-        // 切换到对应模块页
         final state = context.findAncestorStateOfType<_MainScaffoldState>();
         state?.setState(() {
           state._selectedIndex = pageIndex;
         });
       },
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 48, color: Colors.deepPurple),
-              const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
+      child: SizedBox(
+        width: cardWidth,
+        child: Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 48, color: Colors.deepPurple),
+                const SizedBox(height: 12),
+                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _ModuleCardInfo {
+  final IconData icon;
+  final String title;
+  final int pageIndex;
+  _ModuleCardInfo({required this.icon, required this.title, required this.pageIndex});
+  Map<String, dynamic> toMap() => {'icon': icon.codePoint, 'title': title, 'pageIndex': pageIndex};
+  static _ModuleCardInfo fromMap(Map<String, dynamic> map) => _ModuleCardInfo(
+    icon: IconData(map['icon'], fontFamily: 'MaterialIcons'),
+    title: map['title'],
+    pageIndex: map['pageIndex'],
+  );
 }

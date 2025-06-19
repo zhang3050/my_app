@@ -95,17 +95,21 @@ class _ItemPageState extends State<ItemPage> {
                     if (confirm == true) _deleteItem(index);
                   },
                   child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shadowColor: Colors.black12,
                     child: Padding(
-                      padding: const EdgeInsets.all(12.0),
+                      padding: const EdgeInsets.all(18.0),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           const SizedBox(height: 8),
-                          Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          Text('标签: ${item.tag}', style: const TextStyle(fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          Text('价格: ¥${_formatPrice(item.price)}', style: const TextStyle(fontSize: 14)),
+                          Text(item.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                          const SizedBox(height: 8),
+                          Text('标签: ${item.tag}', style: const TextStyle(fontSize: 15, color: Colors.blueGrey), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                          const SizedBox(height: 8),
+                          Text('价格: ¥${_formatPrice(item.price)}', style: const TextStyle(fontSize: 16, color: Colors.deepOrange), textAlign: TextAlign.center),
                         ],
                       ),
                     ),

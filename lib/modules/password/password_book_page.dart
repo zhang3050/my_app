@@ -84,31 +84,34 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
                     if (confirm == true) _deletePassword(index);
                   },
                   child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    shadowColor: Colors.black12,
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(18.0),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Expanded(
                                 child: Text(
                                   item.title,
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
                                 ),
                               ),
                               const Icon(Icons.lock, color: Colors.deepPurple, size: 28),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          Text('账号: ${item.username}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                          const Spacer(),
-                          Text('备注: ${item.notes}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                          const SizedBox(height: 10),
+                          Text('账号: ${item.username}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
+                          const SizedBox(height: 10),
+                          Text('备注: ${item.notes}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Colors.grey), textAlign: TextAlign.center),
                         ],
                       ),
                     ),

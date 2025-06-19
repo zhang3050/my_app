@@ -160,72 +160,77 @@ class _CheckinPageState extends State<CheckinPage> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 1.2,
               ),
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final item = items[index];
                 final checked = item.history.contains(today);
-                return GestureDetector(
-                  onTap: () => _addOrEditCheckin(item: item, index: _box.values.toList().indexOf(item)),
-                  onLongPress: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('删除打卡'),
-                        content: Text('确定要删除"${item.title}"吗？'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('取消'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('删除', style: TextStyle(color: Colors.red)),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirm == true) _deleteCheckin(_box.values.toList().indexOf(item));
-                  },
-                  child: Card(
-                    color: checked
-                        ? Colors.grey[300]
-                        : Colors.lightBlue[100],
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  item.title,
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                return IntrinsicHeight(
+                  child: GestureDetector(
+                    onTap: () => _addOrEditCheckin(item: item, index: _box.values.toList().indexOf(item)),
+                    onLongPress: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text('删除打卡'),
+                          content: Text('确定要删除"${item.title}"吗？'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('取消'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('删除', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) _deleteCheckin(_box.values.toList().indexOf(item));
+                    },
+                    child: Card(
+                      elevation: 6,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shadowColor: Colors.black12,
+                      color: checked
+                          ? Colors.grey[300]
+                          : Colors.lightBlue[100],
+                      child: Padding(
+                        padding: const EdgeInsets.all(18.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  checked ? Icons.check_circle : Icons.radio_button_unchecked,
-                                  color: checked ? Colors.green : Colors.grey,
-                                  size: 32,
+                                IconButton(
+                                  icon: Icon(
+                                    checked ? Icons.check_circle : Icons.radio_button_unchecked,
+                                    color: checked ? Colors.green : Colors.grey,
+                                    size: 32,
+                                  ),
+                                  onPressed: () => _showCheckinDialog(item, _box.values.toList().indexOf(item), checked),
+                                  tooltip: checked ? '取消今日打卡/补打卡' : '打卡/补打卡',
                                 ),
-                                onPressed: () => _showCheckinDialog(item, _box.values.toList().indexOf(item), checked),
-                                tooltip: checked ? '取消今日打卡/补打卡' : '打卡/补打卡',
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text('类型: ${_typeText(item.type)}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                          const Spacer(),
-                          Text('已打卡: ${_getCheckinDays(item)}天', style: const TextStyle(fontSize: 14, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ],
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text('类型: ${_typeText(item.type)}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
+                            const SizedBox(height: 10),
+                            Text('已打卡: ${_getCheckinDays(item)}天', style: const TextStyle(fontSize: 16, color: Colors.deepOrange), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
+                          ],
+                        ),
                       ),
                     ),
                   ),
