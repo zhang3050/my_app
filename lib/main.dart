@@ -225,6 +225,8 @@ class _MainScaffoldState extends State<MainScaffold> {
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
         drawer: _buildDrawer(),
+        // 增大边缘滑动打开Drawer的有效宽度，提升易用性
+        drawerEdgeDragWidth: 56,
         body: _pages[_selectedIndex],
       ),
     );
