@@ -157,8 +157,8 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _addOrEditPassword(),
-          child: const Icon(Icons.add),
           tooltip: '添加密码',
+          child: const Icon(Icons.add),
         ),
       );
     } catch (e, s) {

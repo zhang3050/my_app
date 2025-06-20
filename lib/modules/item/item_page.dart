@@ -168,8 +168,8 @@ class _ItemPageState extends State<ItemPage> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _addOrEditItem(),
-          child: const Icon(Icons.add),
           tooltip: '添加物品',
+          child: const Icon(Icons.add),
         ),
       );
     } catch (e, s) {

@@ -280,8 +280,8 @@ class _CheckinPageState extends State<CheckinPage> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _addOrEditCheckin(),
-          child: const Icon(Icons.add),
           tooltip: '添加打卡',
+          child: const Icon(Icons.add),
         ),
       );
     } catch (e, s) {

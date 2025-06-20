@@ -8,10 +8,7 @@ import 'modules/item/item_page.dart';
 import 'modules/item/item.dart';
 import 'modules/log/log_page.dart';
 import 'modules/log/log_service.dart';
-import 'package:hive/hive.dart';
-import 'package:reorderables/reorderables.dart';
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 
 void main() async {
   // 初始化Flutter绑定，确保所有插件可用
