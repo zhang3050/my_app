@@ -6,9 +6,6 @@ part of 'password_item.dart';
 // TypeAdapterGenerator
 // **************************************************************************
 
-// password_item.g.dart
-// Hive自动生成的PasswordItem适配器代码，用于本地序列化/反序列化
-
 class PasswordItemAdapter extends TypeAdapter<PasswordItem> {
   @override
   final int typeId = 0;

@@ -9,6 +9,8 @@ import 'modules/item/item.dart';
 import 'modules/log/log_page.dart';
 import 'modules/log/log_service.dart';
 import 'dart:async';
+import 'modules/anniversary/anniversary_page.dart';
+import 'modules/anniversary/anniversary_item.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -21,9 +23,11 @@ void main() {
     Hive.registerAdapter(PasswordItemAdapter());
     Hive.registerAdapter(CheckinItemAdapter());
     Hive.registerAdapter(ItemAdapter());
+    Hive.registerAdapter(AnniversaryItemAdapter());
     await Hive.openBox<PasswordItem>('passwords');
     await Hive.openBox<CheckinItem>('checkins');
     await Hive.openBox<Item>('items');
+    await Hive.openBox<AnniversaryItem>('anniversaries');
     await Hive.openBox('main_sort');
     runApp(const MyApp());
   }, (error, stack) {
@@ -67,28 +71,15 @@ class _MainScaffoldState extends State<MainScaffold> {
     _moduleCards = _loadModuleCards();
   }
 
-  /// 加载首页卡片顺序，若无则用默认顺序
+  /// 加载首页卡片顺序，强制只用默认顺序，忽略Hive里的cards
   List<_ModuleCardInfo> _loadModuleCards() {
-    final defaultCards = [
+    return [
       _ModuleCardInfo(iconKey: 'lock', title: '密码本', pageIndex: 1),
       _ModuleCardInfo(iconKey: 'check_circle', title: '打卡', pageIndex: 2),
       _ModuleCardInfo(iconKey: 'inventory', title: '物品管理', pageIndex: 3),
-      _ModuleCardInfo(iconKey: 'bug_report', title: '日志', pageIndex: 4),
+      _ModuleCardInfo(iconKey: 'event', title: '纪念日', pageIndex: 4),
+      _ModuleCardInfo(iconKey: 'bug_report', title: '日志', pageIndex: 5),
     ];
-    final saved = box.get('cards');
-    if (saved is List) {
-      try {
-        final loaded = saved.map((e) => _ModuleCardInfo.fromMap(Map<String, dynamic>.from(e))).toList();
-        final existPages = loaded.map((e) => e.pageIndex).toSet();
-        for (final def in defaultCards) {
-          if (!existPages.contains(def.pageIndex)) {
-            loaded.add(def);
-          }
-        }
-        return loaded;
-      } catch (_) {}
-    }
-    return defaultCards;
   }
 
   /// 保存首页卡片顺序到本地
@@ -100,16 +91,11 @@ class _MainScaffoldState extends State<MainScaffold> {
   List<Widget> get _pages => [
     HomePage(
       moduleCards: _moduleCards,
-      onSort: (cards) {
-        setState(() {
-          _moduleCards = List.from(cards);
-        });
-        _saveModuleCards();
-      },
     ),
     const PasswordBookPage(),
     const CheckinPage(),
     const ItemPage(),
+    const AnniversaryPage(),
     const LogPage(),
     const SettingsPage(),
   ];
@@ -174,10 +160,10 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
-          // 日志入口
+          // 纪念日入口
           ListTile(
-            leading: const Icon(Icons.bug_report),
-            title: const Text('日志'),
+            leading: const Icon(Icons.event),
+            title: const Text('纪念日'),
             selected: _selectedIndex == 4,
             onTap: () {
               setState(() {
@@ -186,14 +172,26 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
-          // 设置入口
+          // 日志入口
           ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('设置'),
+            leading: const Icon(Icons.bug_report),
+            title: const Text('日志'),
             selected: _selectedIndex == 5,
             onTap: () {
               setState(() {
                 _selectedIndex = 5;
+              });
+              Navigator.pop(context);
+            },
+          ),
+          // 设置入口
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text('设置'),
+            selected: _selectedIndex == 6,
+            onTap: () {
+              setState(() {
+                _selectedIndex = 6;
               });
               Navigator.pop(context);
             },
@@ -221,7 +219,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       child: Scaffold(
         appBar: AppBar(
           // 动态标题
-          title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : _selectedIndex == 2 ? '打卡' : _selectedIndex == 3 ? '物品管理' : _selectedIndex == 4 ? '日志' : _selectedIndex == 5 ? '设置' : ''),
+          title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : _selectedIndex == 2 ? '打卡' : _selectedIndex == 3 ? '物品管理' : _selectedIndex == 4 ? '纪念日' : _selectedIndex == 5 ? '日志' : _selectedIndex == 6 ? '设置' : ''),
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
         drawer: _buildDrawer(),
@@ -236,8 +234,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 /// 首页：卡片式功能入口，支持拖拽排序
 class HomePage extends StatefulWidget {
   final List<_ModuleCardInfo> moduleCards;
-  final void Function(List<_ModuleCardInfo>) onSort;
-  const HomePage({super.key, required this.moduleCards, required this.onSort});
+  const HomePage({super.key, required this.moduleCards});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -248,7 +245,6 @@ class _HomePageState extends State<HomePage> {
   late int col;
   late double ratio, hgap, vgap, pad;
   StreamSubscription? _hiveSub;
-  bool _reorderMode = false;
 
   @override
   void initState() {
@@ -280,150 +276,37 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // 获取各模块数量
-    int passwordCount = 0, checkinCount = 0, itemCount = 0, logCount = 0;
     try {
-      passwordCount = Hive.box<PasswordItem>('passwords').length;
-    } catch (_) {}
-    try {
-      checkinCount = Hive.box<CheckinItem>('checkins').length;
-    } catch (_) {}
-    try {
-      itemCount = Hive.box<Item>('items').length;
-    } catch (_) {}
-    try {
-      logCount = LogService.errors.length;
-    } catch (_) {}
-    final Map<int, int> moduleCounts = {
-      1: passwordCount,
-      2: checkinCount,
-      3: itemCount,
-      4: logCount,
-    };
-    return Stack(
-      children: [
-        Column(
-          children: [
-            Expanded(
-              child: _reorderMode
-                  ? ReorderableListView(
-                      padding: EdgeInsets.all(pad),
-                      onReorder: (oldIndex, newIndex) {
-                        setState(() {
-                          if (newIndex > oldIndex) newIndex--;
-                          final item = _cards.removeAt(oldIndex);
-                          _cards.insert(newIndex, item);
-                        });
-                      },
-                      children: [
-                        for (int idx = 0; idx < _cards.length; idx++)
-                          Padding(
-                            key: ValueKey(_cards[idx].title),
-                            padding: EdgeInsets.only(bottom: vgap),
-                            child: _buildModuleCard(context, _cards[idx].iconKey, _cards[idx].title, _cards[idx].pageIndex),
-                          ),
-                      ],
-                    )
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        return GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: EdgeInsets.all(pad),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: col,
-                            crossAxisSpacing: hgap,
-                            mainAxisSpacing: vgap,
-                            childAspectRatio: ratio,
-                          ),
-                          itemCount: _cards.length,
-                          itemBuilder: (context, idx) {
-                            final card = _cards[idx];
-                            return _buildModuleCard(context, card.iconKey, card.title, card.pageIndex, key: ValueKey(card.title));
-                          },
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-        // 悬浮按钮
-        if (!_reorderMode)
-          Positioned(
-            bottom: 28,
-            right: 28,
-            child: FloatingActionButton.extended(
-              icon: const Icon(Icons.reorder),
-              label: const Text('调整顺序'),
-              onPressed: () {
-                setState(() {
-                  _reorderMode = true;
-                });
+      return Column(
+        children: [
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.all(pad),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: col,
+                    crossAxisSpacing: hgap,
+                    mainAxisSpacing: vgap,
+                    childAspectRatio: ratio,
+                  ),
+                  itemCount: _cards.length,
+                  itemBuilder: (context, idx) {
+                    final card = _cards[idx];
+                    return _buildModuleCard(context, card.iconKey, card.title, card.pageIndex, key: ValueKey(card.title));
+                  },
+                );
               },
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-              elevation: 4,
             ),
           ),
-        // 拖拽模式底部操作栏
-        if (_reorderMode)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              child: Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.save),
-                        label: const Text('保存顺序'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _reorderMode = false;
-                          });
-                          widget.onSort(_cards);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 18),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.cancel),
-                        label: const Text('取消'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.primary,
-                          side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _cards = List.from(widget.moduleCards);
-                            _reorderMode = false;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
+        ],
+      );
+    } catch (e, s) {
+      LogService.addError('首页卡片构建异常: $e\n$s');
+      return const Center(child: Text('页面出错，详情见日志'));
+    }
   }
 
   Widget _buildInfoStat({required IconData icon, required String label, required int count, required Color color}) {
@@ -452,10 +335,11 @@ class _HomePageState extends State<HomePage> {
       Color(0xFFA5D6F9), // 密码本 浅蓝
       Color(0xFFFFD580), // 打卡 浅橙
       Color(0xFFB2E5C8), // 物品管理 浅绿
+      Color(0xFFB39DDB), // 纪念日 浅紫
       Color(0xFFFFB6B9), // 日志 浅粉
     ];
     final Color cardColor =
-        pageIndex == 1 ? mainColors[1] : pageIndex == 2 ? mainColors[2] : pageIndex == 3 ? mainColors[3] : pageIndex == 4 ? mainColors[4] : mainColors[0];
+        pageIndex == 1 ? mainColors[1] : pageIndex == 2 ? mainColors[2] : pageIndex == 3 ? mainColors[3] : pageIndex == 4 ? mainColors[4] : pageIndex == 5 ? mainColors[5] : mainColors[0];
     // 获取各模块数量
     int count = 0;
     if (pageIndex == 1) {
@@ -465,9 +349,14 @@ class _HomePageState extends State<HomePage> {
     } else if (pageIndex == 3) {
       try { count = Hive.box<Item>('items').length; } catch (_) {}
     } else if (pageIndex == 4) {
+      try { count = Hive.box<AnniversaryItem>('anniversaries').length; } catch (_) {}
+    } else if (pageIndex == 5) {
       try { count = LogService.errors.length; } catch (_) {}
     }
-    String countLabel = pageIndex == 1 ? '密码' : pageIndex == 2 ? '打卡' : pageIndex == 3 ? '物品' : pageIndex == 4 ? '日志' : '';
+    // 修正icon和文字
+    IconData icon = _iconFromKey(iconKey);
+    String displayTitle = title;
+    String countLabel = pageIndex == 1 ? '密码' : pageIndex == 2 ? '打卡' : pageIndex == 3 ? '物品' : pageIndex == 4 ? '纪念日' : pageIndex == 5 ? '日志' : '';
     return GestureDetector(
       key: key,
       onTap: () {
@@ -520,12 +409,12 @@ class _HomePageState extends State<HomePage> {
                         ],
                       ),
                       child: Center(
-                        child: Icon(_iconFromKey(iconKey), size: 18, color: Colors.white),
+                        child: Icon(icon, size: 18, color: Colors.white),
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      title,
+                      displayTitle,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -594,6 +483,7 @@ IconData _iconFromKey(String key) {
     case 'lock': return Icons.lock;
     case 'check_circle': return Icons.check_circle;
     case 'inventory': return Icons.inventory;
+    case 'event': return Icons.event;
     case 'bug_report': return Icons.bug_report;
     default: return Icons.extension;
   }
@@ -618,8 +508,8 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late Box box;
-  final List<String> modules = ['首页卡片', '密码本', '打卡', '物品管理', '日志'];
-  final List<String> keys = ['home', 'password', 'checkin', 'item', 'log'];
+  final List<String> modules = ['首页卡片', '密码本', '打卡', '物品管理', '纪念日', '日志'];
+  final List<String> keys = ['home', 'password', 'checkin', 'item', 'anniversary', 'log'];
   Map<String, int> colMap = {};
   Map<String, double> ratioMap = {};
   Map<String, double> hgapMap = {};
@@ -681,6 +571,12 @@ class _SettingsPageState extends State<SettingsPage> {
             title: const Text('物品管理'),
             children: [
               _buildSliderTile('物品管理', 'item'),
+            ],
+          ),
+          ExpansionTile(
+            title: const Text('纪念日'),
+            children: [
+              _buildSliderTile('纪念日', 'anniversary'),
             ],
           ),
         ],

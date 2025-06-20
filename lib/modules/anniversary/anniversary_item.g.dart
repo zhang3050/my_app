@@ -1,44 +1,47 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'item.dart';
+part of 'anniversary_item.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class ItemAdapter extends TypeAdapter<Item> {
+class AnniversaryItemAdapter extends TypeAdapter<AnniversaryItem> {
   @override
-  final int typeId = 2;
+  final int typeId = 10;
 
   @override
-  Item read(BinaryReader reader) {
+  AnniversaryItem read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return Item(
+    return AnniversaryItem(
       name: fields[0] as String,
-      tag: fields[1] as String,
-      price: fields[2] as double,
+      date: fields[1] as DateTime,
+      isLunar: fields[2] as bool,
       notes: fields[3] as String,
-      imagePath: fields[4] as String?,
+      tag: fields[4] as String,
+      repeatYearly: fields[5] as bool,
     );
   }
 
   @override
-  void write(BinaryWriter writer, Item obj) {
+  void write(BinaryWriter writer, AnniversaryItem obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
-      ..write(obj.tag)
+      ..write(obj.date)
       ..writeByte(2)
-      ..write(obj.price)
+      ..write(obj.isLunar)
       ..writeByte(3)
       ..write(obj.notes)
       ..writeByte(4)
-      ..write(obj.imagePath);
+      ..write(obj.tag)
+      ..writeByte(5)
+      ..write(obj.repeatYearly);
   }
 
   @override
@@ -47,7 +50,7 @@ class ItemAdapter extends TypeAdapter<Item> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ItemAdapter &&
+      other is AnniversaryItemAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

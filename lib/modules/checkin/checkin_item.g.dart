@@ -6,9 +6,6 @@ part of 'checkin_item.dart';
 // TypeAdapterGenerator
 // **************************************************************************
 
-// checkin_item.g.dart
-// Hive自动生成的CheckinItem适配器代码，用于本地序列化/反序列化
-
 class CheckinItemAdapter extends TypeAdapter<CheckinItem> {
   @override
   final int typeId = 1;
