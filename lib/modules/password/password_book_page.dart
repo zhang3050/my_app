@@ -12,11 +12,19 @@ class PasswordBookPage extends StatefulWidget {
 
 class _PasswordBookPageState extends State<PasswordBookPage> {
   late Box<PasswordItem> _box; // Hive盒子，存储所有密码项
+  String _search = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _box = Hive.box<PasswordItem>('passwords'); // 获取密码本数据盒子
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   /// 添加或编辑密码项，弹窗输入
@@ -45,114 +53,154 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
   Widget build(BuildContext context) {
     try {
       return Scaffold(
-        body: ValueListenableBuilder(
-          valueListenable: _box.listenable(),
-          builder: (context, Box<PasswordItem> box, _) {
-            if (box.isEmpty) {
-              return const Center(child: Text('暂无密码，点击右下角添加', style: TextStyle(fontSize: 18)));
-            }
-            return GridView.builder(
-              padding: EdgeInsets.all(() {
-                try { return Hive.box('main_sort').get('password_pad') as double? ?? 16; } catch (_) { return 16.0; }
-              }()),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: (() {
-                  try { return Hive.box('main_sort').get('password_col') as int? ?? 2; } catch (_) { return 2; }
-                })(),
-                crossAxisSpacing: (() {
-                  try { return Hive.box('main_sort').get('password_hgap') as double? ?? 16; } catch (_) { return 16.0; }
-                })(),
-                mainAxisSpacing: (() {
-                  try { return Hive.box('main_sort').get('password_vgap') as double? ?? 16; } catch (_) { return 16.0; }
-                })(),
-                childAspectRatio: (() {
-                  try { return Hive.box('main_sort').get('password_ratio') as double? ?? 1.2; } catch (_) { return 1.2; }
-                })(),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: '搜索标题、账号、备注...（支持模糊搜索）',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  suffixIcon: _search.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _search = '';
+                              _searchController.clear();
+                            });
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (v) => setState(() => _search = v.trim()),
               ),
-              itemCount: box.length,
-              itemBuilder: (context, index) {
-                final item = box.getAt(index)!;
-                return GestureDetector(
-                  onTap: () => _addOrEditPassword(item: item, index: index), // 点击编辑
-                  onLongPress: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('删除密码'),
-                        content: Text('确定要删除"${item.title}"吗？'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('取消'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('删除', style: TextStyle(color: Colors.red)),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirm == true) _deletePassword(index);
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFA5D6F9), Colors.white],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0xFFA5D6F9).withOpacity(0.10),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                      border: Border.all(color: Color(0xFFA5D6F9).withOpacity(0.18), width: 1.2),
+            ),
+            Expanded(
+              child: ValueListenableBuilder(
+                valueListenable: _box.listenable(),
+                builder: (context, Box<PasswordItem> box, _) {
+                  final List<PasswordItem> allItems = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
+                  final List<PasswordItem> items = _search.isEmpty
+                      ? allItems
+                      : allItems.where((item) {
+                          final q = _search.toLowerCase();
+                          return item.title.toLowerCase().contains(q) ||
+                              item.username.toLowerCase().contains(q) ||
+                              item.notes.toLowerCase().contains(q);
+                        }).toList();
+                  if (items.isEmpty) {
+                    return const Center(child: Text('暂无匹配密码，换个关键词试试', style: TextStyle(fontSize: 18)));
+                  }
+                  return GridView.builder(
+                    padding: EdgeInsets.all(() {
+                      try { return Hive.box('main_sort').get('password_pad') as double? ?? 16; } catch (_) { return 16.0; }
+                    }()),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: (() {
+                        try { return Hive.box('main_sort').get('password_col') as int? ?? 2; } catch (_) { return 2; }
+                      })(),
+                      crossAxisSpacing: (() {
+                        try { return Hive.box('main_sort').get('password_hgap') as double? ?? 16; } catch (_) { return 16.0; }
+                      })(),
+                      mainAxisSpacing: (() {
+                        try { return Hive.box('main_sort').get('password_vgap') as double? ?? 16; } catch (_) { return 16.0; }
+                      })(),
+                      childAspectRatio: (() {
+                        try { return Hive.box('main_sort').get('password_ratio') as double? ?? 1.2; } catch (_) { return 1.2; }
+                      })(),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 10),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color(0xFFA5D6F9),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return GestureDetector(
+                        onTap: () => _addOrEditPassword(item: item, index: allItems.indexOf(item)), // 点击编辑
+                        onLongPress: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('删除密码'),
+                              content: Text('确定要删除"${item.title}"吗？'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('取消'),
                                 ),
-                                child: const Icon(Icons.lock, color: Colors.white, size: 22),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  item.title,
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c)),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('删除', style: TextStyle(color: Colors.red)),
                                 ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) _deletePassword(allItems.indexOf(item));
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFA5D6F9), Colors.white],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Color(0xFFA5D6F9).withOpacity(0.10),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
                               ),
                             ],
+                            border: Border.all(color: Color(0xFFA5D6F9).withOpacity(0.18), width: 1.2),
                           ),
-                          const SizedBox(height: 12),
-                          Text('账号: ${item.username}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
-                          const SizedBox(height: 10),
-                          Text('备注: ${item.notes}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Colors.grey), textAlign: TextAlign.center),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 10),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Color(0xFFA5D6F9),
+                                      ),
+                                      child: const Icon(Icons.lock, color: Colors.white, size: 22),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        item.title,
+                                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c)),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text('账号: ${item.username}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
+                                const SizedBox(height: 10),
+                                Text('备注: ${item.notes}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Colors.grey), textAlign: TextAlign.center),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _addOrEditPassword(),
