@@ -210,20 +210,22 @@ class _CheckinPageState extends State<CheckinPage> {
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFFD580), Colors.white],
+                      gradient: LinearGradient(
+                        colors: checked
+                            ? [const Color(0xFFD3D3D3), Colors.white] // 已打卡：灰色
+                            : [const Color(0xFFFFD580), Colors.white], // 未打卡：浅橙色
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Color(0xFFFFD580).withOpacity(0.10),
+                          color: (checked ? const Color(0xFFD3D3D3) : const Color(0xFFFFD580)).withOpacity(0.10),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
                       ],
-                      border: Border.all(color: Color(0xFFFFD580).withOpacity(0.18), width: 1.2),
+                      border: Border.all(color: (checked ? const Color(0xFFD3D3D3) : const Color(0xFFFFD580)).withOpacity(0.18), width: 1.2),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8),
@@ -234,9 +236,9 @@ class _CheckinPageState extends State<CheckinPage> {
                           Container(
                             width: 36,
                             height: 36,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Color(0xFFFFD580),
+                              color: checked ? const Color(0xFFD3D3D3) : const Color(0xFFFFD580),
                             ),
                             child: Icon(
                               checked ? Icons.check_circle : Icons.radio_button_unchecked,
@@ -260,14 +262,16 @@ class _CheckinPageState extends State<CheckinPage> {
                             textAlign: TextAlign.center,
                             style: const TextStyle(fontSize: 13, color: Colors.blueGrey),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '已打卡: ${_getCheckinDays(item)}天',
-                            style: const TextStyle(fontSize: 13, color: Colors.deepOrange),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                          ),
+                          if (item.type == 'weekly' || item.type == 'monthly') ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '已打卡: ${_getCheckinDays(item)}天',
+                              style: const TextStyle(fontSize: 13, color: Colors.deepOrange),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ],
                       ),
                     ),
