@@ -10,26 +10,21 @@ import 'modules/log/log_page.dart';
 import 'modules/log/log_service.dart';
 import 'dart:async';
 
-void main() async {
-  // 初始化Flutter绑定，确保所有插件可用
-  WidgetsFlutterBinding.ensureInitialized();
-  FlutterError.onError = (FlutterErrorDetails details) {
-    LogService.addError('FlutterError: ${details.exceptionAsString()}\\n${details.stack}');
-    FlutterError.presentError(details);
-  };
+void main() {
   runZonedGuarded(() async {
-    // 初始化Hive本地数据库
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (FlutterErrorDetails details) {
+      LogService.addError('FlutterError: ${details.exceptionAsString()}\\n${details.stack}');
+      FlutterError.presentError(details);
+    };
     await Hive.initFlutter();
-    // 注册各模块的数据模型适配器
     Hive.registerAdapter(PasswordItemAdapter());
     Hive.registerAdapter(CheckinItemAdapter());
     Hive.registerAdapter(ItemAdapter());
-    // 打开各模块的数据盒子（本地持久化）
     await Hive.openBox<PasswordItem>('passwords');
     await Hive.openBox<CheckinItem>('checkins');
     await Hive.openBox<Item>('items');
     await Hive.openBox('main_sort');
-    // 启动应用
     runApp(const MyApp());
   }, (error, stack) {
     LogService.addError('ZoneError: $error\\n$stack');
@@ -251,6 +246,7 @@ class _HomePageState extends State<HomePage> {
   late int col;
   late double ratio, hgap, vgap, pad;
   StreamSubscription? _hiveSub;
+  bool _reorderMode = false;
 
   @override
   void initState() {
@@ -302,25 +298,129 @@ class _HomePageState extends State<HomePage> {
       3: itemCount,
       4: logCount,
     };
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.all(pad),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: col,
-            crossAxisSpacing: hgap,
-            mainAxisSpacing: vgap,
-            childAspectRatio: ratio,
+    return Stack(
+      children: [
+        Column(
+          children: [
+            Expanded(
+              child: _reorderMode
+                  ? ReorderableListView(
+                      padding: EdgeInsets.all(pad),
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) newIndex--;
+                          final item = _cards.removeAt(oldIndex);
+                          _cards.insert(newIndex, item);
+                        });
+                      },
+                      children: [
+                        for (int idx = 0; idx < _cards.length; idx++)
+                          Padding(
+                            key: ValueKey(_cards[idx].title),
+                            padding: EdgeInsets.only(bottom: vgap),
+                            child: _buildModuleCard(context, _cards[idx].iconKey, _cards[idx].title, _cards[idx].pageIndex),
+                          ),
+                      ],
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.all(pad),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: col,
+                            crossAxisSpacing: hgap,
+                            mainAxisSpacing: vgap,
+                            childAspectRatio: ratio,
+                          ),
+                          itemCount: _cards.length,
+                          itemBuilder: (context, idx) {
+                            final card = _cards[idx];
+                            return _buildModuleCard(context, card.iconKey, card.title, card.pageIndex, key: ValueKey(card.title));
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+        // 悬浮按钮
+        if (!_reorderMode)
+          Positioned(
+            bottom: 28,
+            right: 28,
+            child: FloatingActionButton.extended(
+              icon: const Icon(Icons.reorder),
+              label: const Text('调整顺序'),
+              onPressed: () {
+                setState(() {
+                  _reorderMode = true;
+                });
+              },
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              elevation: 4,
+            ),
           ),
-          itemCount: _cards.length,
-          itemBuilder: (context, idx) {
-            final card = _cards[idx];
-            return _buildModuleCard(context, card.iconKey, card.title, card.pageIndex, key: ValueKey(card.title));
-          },
-        );
-      },
+        // 拖拽模式底部操作栏
+        if (_reorderMode)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.save),
+                        label: const Text('保存顺序'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _reorderMode = false;
+                          });
+                          widget.onSort(_cards);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.cancel),
+                        label: const Text('取消'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _cards = List.from(widget.moduleCards);
+                            _reorderMode = false;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
