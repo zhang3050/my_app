@@ -132,173 +132,184 @@ class _AnniversaryPageState extends State<AnniversaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // 标签筛选区
-        if (_tags.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 12, left: 12, right: 12, bottom: 2),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  ChoiceChip(
-                    label: const Text('全部'),
-                    selected: _filterTag == '全部',
-                    onSelected: (_) => setState(() => _filterTag = '全部'),
-                    selectedColor: Theme.of(context).colorScheme.primary,
-                    labelStyle: TextStyle(color: _filterTag == '全部' ? Colors.white : Colors.black87),
-                  ),
-                  ..._tags.map((tag) => Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: ChoiceChip(
-                      label: Text(tag),
-                      selected: _filterTag == tag,
-                      onSelected: (_) => setState(() => _filterTag = tag),
+    return Scaffold(
+      body: Column(
+        children: [
+          // 标签筛选区
+          if (_tags.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12, left: 12, right: 12, bottom: 2),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('全部'),
+                      selected: _filterTag == '全部',
+                      onSelected: (_) => setState(() => _filterTag = '全部'),
                       selectedColor: Theme.of(context).colorScheme.primary,
-                      labelStyle: TextStyle(color: _filterTag == tag ? Colors.white : Colors.black87),
+                      labelStyle: TextStyle(color: _filterTag == '全部' ? Colors.white : Colors.black87),
                     ),
-                  )),
-                ],
+                    ..._tags.map((tag) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ChoiceChip(
+                        label: Text(tag),
+                        selected: _filterTag == tag,
+                        onSelected: (_) => setState(() => _filterTag = tag),
+                        selectedColor: Theme.of(context).colorScheme.primary,
+                        labelStyle: TextStyle(color: _filterTag == tag ? Colors.white : Colors.black87),
+                      ),
+                    )),
+                  ],
+                ),
               ),
             ),
-          ),
-        // 搜索框
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.search),
-              hintText: '搜索纪念日名称、备注、标签...（支持模糊搜索）',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-              suffixIcon: _search.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        setState(() {
-                          _search = '';
-                          _searchController.clear();
-                        });
-                      },
-                    )
-                  : null,
+          // 搜索框
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                hintText: '搜索纪念日名称、备注、标签...（支持模糊搜索）',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                suffixIcon: _search.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _search = '';
+                            _searchController.clear();
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (v) => setState(() => _search = v.trim()),
             ),
-            onChanged: (v) => setState(() => _search = v.trim()),
           ),
-        ),
-        Expanded(
-          child: ValueListenableBuilder(
-            valueListenable: _box.listenable(),
-            builder: (context, Box<AnniversaryItem> box, _) {
-              final List<AnniversaryItem> allItems = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
-              // 标签筛选
-              final List<AnniversaryItem> filtered = _filterTag == '全部' ? allItems : allItems.where((item) => item.tag == _filterTag).toList();
-              // 搜索
-              final List<AnniversaryItem> items = _search.isEmpty
-                  ? filtered
-                  : filtered.where((item) {
-                      final q = _search.toLowerCase();
-                      return item.name.toLowerCase().contains(q) ||
-                          item.notes.toLowerCase().contains(q) ||
-                          item.tag.toLowerCase().contains(q);
-                    }).toList();
-              // 按倒计时排序
-              items.sort((a, b) => _daysToAnniversary(a).compareTo(_daysToAnniversary(b)));
-              if (items.isEmpty) {
-                return const Center(child: Text('暂无匹配纪念日，换个关键词试试', style: TextStyle(fontSize: 18)));
-              }
-              return GridView.builder(
-                padding: EdgeInsets.all(pad),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: col,
-                  crossAxisSpacing: hgap,
-                  mainAxisSpacing: vgap,
-                  childAspectRatio: ratio,
-                ),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  final days = _daysToAnniversary(item);
-                  final isSoon = days >= 0 && days <= 7;
-                  return GestureDetector(
-                    onTap: () => _addOrEditAnniversary(item: item, index: allItems.indexOf(item)),
-                    onLongPress: () => _deleteAnniversary(allItems.indexOf(item)),
-                    child: Card(
-                      margin: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(item.isLunar ? Icons.brightness_2 : Icons.wb_sunny, size: 18, color: item.isLunar ? Colors.deepOrange : Colors.blue),
-                                const SizedBox(width: 4),
-                                Text(item.isLunar ? '农历' : '公历'),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            // 名称自动折叠
-                            Text(
-                              item.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            Text('日期: ${item.date.year}-${item.date.month}-${item.date.day}', style: const TextStyle(fontSize: 13)),
-                            // 备注自动折叠
-                            if (item.notes.isNotEmpty)
+          Expanded(
+            child: ValueListenableBuilder(
+              valueListenable: _box.listenable(),
+              builder: (context, Box<AnniversaryItem> box, _) {
+                final List<AnniversaryItem> allItems = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
+                // 标签筛选
+                final List<AnniversaryItem> filtered = _filterTag == '全部' ? allItems : allItems.where((item) => item.tag == _filterTag).toList();
+                // 搜索
+                final List<AnniversaryItem> items = _search.isEmpty
+                    ? filtered
+                    : filtered.where((item) {
+                        final q = _search.toLowerCase();
+                        return item.name.toLowerCase().contains(q) ||
+                            item.notes.toLowerCase().contains(q) ||
+                            item.tag.toLowerCase().contains(q);
+                      }).toList();
+                // 按倒计时排序
+                items.sort((a, b) => _daysToAnniversary(a).compareTo(_daysToAnniversary(b)));
+                if (items.isEmpty) {
+                  return const Center(child: Text('暂无匹配纪念日，换个关键词试试', style: TextStyle(fontSize: 18)));
+                }
+                return GridView.builder(
+                  padding: EdgeInsets.all(pad),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: col,
+                    crossAxisSpacing: hgap,
+                    mainAxisSpacing: vgap,
+                    childAspectRatio: ratio,
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final days = _daysToAnniversary(item);
+                    final isSoon = days >= 0 && days <= 7;
+                    return GestureDetector(
+                      onTap: () => _addOrEditAnniversary(item: item, index: allItems.indexOf(item)),
+                      onLongPress: () => _deleteAnniversary(allItems.indexOf(item)),
+                      child: Card(
+                        margin: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        elevation: 4,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(item.isLunar ? Icons.brightness_2 : Icons.wb_sunny, size: 18, color: item.isLunar ? Colors.deepOrange : Colors.blue),
+                                  const SizedBox(width: 4),
+                                  Text(item.isLunar ? '农历' : '公历'),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              // 名称自动折叠
                               Text(
-                                '备注: ${item.notes}',
-                                style: const TextStyle(fontSize: 12, color: Colors.black54),
-                                maxLines: 2,
+                                item.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            const Spacer(),
-                            // 卡片底部内容防溢出
-                            Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 4,
-                              runSpacing: 2,
-                              children: [
-                                Icon(Icons.timer, size: 18, color: isSoon ? Colors.red : Colors.deepOrange),
+                              const SizedBox(height: 4),
+                              Text('日期: ${item.date.year}-${item.date.month}-${item.date.day}', style: const TextStyle(fontSize: 13)),
+                              // 备注自动折叠
+                              if (item.notes.isNotEmpty)
                                 Text(
-                                  days == 0 ? '今天' : days < 0 ? '已过' : '距离纪念日: $days 天',
-                                  style: TextStyle(
-                                    color: isSoon ? Colors.red : Colors.deepOrange,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                  maxLines: 1,
+                                  '备注: ${item.notes}',
+                                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                                  maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                Chip(
-                                  label: Text(
-                                    item.tag,
+                              const Spacer(),
+                              // 卡片底部内容防溢出
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 4,
+                                runSpacing: 2,
+                                children: [
+                                  Icon(Icons.timer, size: 18, color: isSoon ? Colors.red : Colors.deepOrange),
+                                  Text(
+                                    days == 0 ? '今天' : days < 0 ? '已过' : '距离纪念日: $days 天',
+                                    style: TextStyle(
+                                      color: isSoon ? Colors.red : Colors.deepOrange,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                  Chip(
+                                    label: Text(
+                                      item.tag,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              );
-            },
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _addOrEditAnniversary(),
+        child: const Icon(Icons.add),
+        tooltip: '添加纪念日',
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 4,
+      ),
     );
   }
 }
