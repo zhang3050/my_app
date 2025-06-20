@@ -11,6 +11,10 @@ import 'modules/log/log_service.dart';
 import 'dart:async';
 import 'modules/anniversary/anniversary_page.dart';
 import 'modules/anniversary/anniversary_item.dart';
+import 'modules/idea/idea_page.dart';
+import 'modules/idea/idea_archive_page.dart';
+import 'modules/idea/idea_trash_page.dart';
+import 'modules/idea/idea_item.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -24,10 +28,12 @@ void main() {
     Hive.registerAdapter(CheckinItemAdapter());
     Hive.registerAdapter(ItemAdapter());
     Hive.registerAdapter(AnniversaryItemAdapter());
+    Hive.registerAdapter(IdeaItemAdapter());
     await Hive.openBox<PasswordItem>('passwords');
     await Hive.openBox<CheckinItem>('checkins');
     await Hive.openBox<Item>('items');
     await Hive.openBox<AnniversaryItem>('anniversaries');
+    await Hive.openBox<IdeaItem>('ideas');
     await Hive.openBox('main_sort');
     runApp(const MyApp());
   }, (error, stack) {
@@ -78,7 +84,8 @@ class _MainScaffoldState extends State<MainScaffold> {
       _ModuleCardInfo(iconKey: 'check_circle', title: '打卡', pageIndex: 2),
       _ModuleCardInfo(iconKey: 'inventory', title: '物品管理', pageIndex: 3),
       _ModuleCardInfo(iconKey: 'event', title: '纪念日', pageIndex: 4),
-      _ModuleCardInfo(iconKey: 'bug_report', title: '日志', pageIndex: 5),
+      _ModuleCardInfo(iconKey: 'lightbulb', title: '创意收集', pageIndex: 5),
+      _ModuleCardInfo(iconKey: 'bug_report', title: '日志', pageIndex: 6),
     ];
   }
 
@@ -96,6 +103,7 @@ class _MainScaffoldState extends State<MainScaffold> {
     const CheckinPage(),
     const ItemPage(),
     const AnniversaryPage(),
+    const IdeaPage(),
     const LogPage(),
     const SettingsPage(),
   ];
@@ -172,10 +180,10 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
-          // 日志入口
+          // 创意收集入口
           ListTile(
-            leading: const Icon(Icons.bug_report),
-            title: const Text('日志'),
+            leading: const Icon(Icons.lightbulb),
+            title: const Text('创意收集'),
             selected: _selectedIndex == 5,
             onTap: () {
               setState(() {
@@ -184,14 +192,26 @@ class _MainScaffoldState extends State<MainScaffold> {
               Navigator.pop(context);
             },
           ),
-          // 设置入口
+          // 日志入口
           ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('设置'),
+            leading: const Icon(Icons.bug_report),
+            title: const Text('日志'),
             selected: _selectedIndex == 6,
             onTap: () {
               setState(() {
                 _selectedIndex = 6;
+              });
+              Navigator.pop(context);
+            },
+          ),
+          // 设置入口
+          ListTile(
+            leading: const Icon(Icons.settings),
+            title: const Text('设置'),
+            selected: _selectedIndex == 7,
+            onTap: () {
+              setState(() {
+                _selectedIndex = 7;
               });
               Navigator.pop(context);
             },
@@ -219,7 +239,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       child: Scaffold(
         appBar: AppBar(
           // 动态标题
-          title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : _selectedIndex == 2 ? '打卡' : _selectedIndex == 3 ? '物品管理' : _selectedIndex == 4 ? '纪念日' : _selectedIndex == 5 ? '日志' : _selectedIndex == 6 ? '设置' : ''),
+          title: Text(_selectedIndex == 0 ? '首页' : _selectedIndex == 1 ? '密码本' : _selectedIndex == 2 ? '打卡' : _selectedIndex == 3 ? '物品管理' : _selectedIndex == 4 ? '纪念日' : _selectedIndex == 5 ? '创意收集' : _selectedIndex == 6 ? '日志' : _selectedIndex == 7 ? '设置' : ''),
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         ),
         drawer: _buildDrawer(),
@@ -336,27 +356,34 @@ class _HomePageState extends State<HomePage> {
       Color(0xFFFFD580), // 打卡 浅橙
       Color(0xFFB2E5C8), // 物品管理 浅绿
       Color(0xFFB39DDB), // 纪念日 浅紫
+      Color(0xFF7ED6DF), // 创意收集 独特蓝绿
       Color(0xFFFFB6B9), // 日志 浅粉
     ];
     final Color cardColor =
-        pageIndex == 1 ? mainColors[1] : pageIndex == 2 ? mainColors[2] : pageIndex == 3 ? mainColors[3] : pageIndex == 4 ? mainColors[4] : pageIndex == 5 ? mainColors[5] : mainColors[0];
+        pageIndex == 1 ? mainColors[1] : pageIndex == 2 ? mainColors[2] : pageIndex == 3 ? mainColors[3] : pageIndex == 4 ? mainColors[4] : pageIndex == 5 ? mainColors[5] : pageIndex == 6 ? mainColors[6] : mainColors[0];
     // 获取各模块数量
     int count = 0;
+    String countLabel = '';
     if (pageIndex == 1) {
-      try { count = Hive.box<PasswordItem>('passwords').length; } catch (_) {}
+      try { count = Hive.box<PasswordItem>('passwords').length; countLabel = '密码'; } catch (_) {}
     } else if (pageIndex == 2) {
-      try { count = Hive.box<CheckinItem>('checkins').length; } catch (_) {}
+      try { count = Hive.box<CheckinItem>('checkins').length; countLabel = '打卡'; } catch (_) {}
     } else if (pageIndex == 3) {
-      try { count = Hive.box<Item>('items').length; } catch (_) {}
+      try { count = Hive.box<Item>('items').length; countLabel = '物品'; } catch (_) {}
     } else if (pageIndex == 4) {
-      try { count = Hive.box<AnniversaryItem>('anniversaries').length; } catch (_) {}
+      try { count = Hive.box<AnniversaryItem>('anniversaries').length; countLabel = '纪念日'; } catch (_) {}
     } else if (pageIndex == 5) {
-      try { count = LogService.errors.length; } catch (_) {}
+      try {
+        final box = Hive.box<IdeaItem>('ideas');
+        count = box.values.where((e) => !e.isDeleted && !e.isArchived).length;
+        countLabel = '创意';
+      } catch (_) {}
+    } else if (pageIndex == 6) {
+      try { count = LogService.errors.length; countLabel = '日志'; } catch (_) {}
     }
     // 修正icon和文字
     IconData icon = _iconFromKey(iconKey);
     String displayTitle = title;
-    String countLabel = pageIndex == 1 ? '密码' : pageIndex == 2 ? '打卡' : pageIndex == 3 ? '物品' : pageIndex == 4 ? '纪念日' : pageIndex == 5 ? '日志' : '';
     return GestureDetector(
       key: key,
       onTap: () {
@@ -386,75 +413,44 @@ class _HomePageState extends State<HomePage> {
             ],
             border: Border.all(color: cardColor.withOpacity(0.18), width: 1.2),
           ),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: cardColor,
-                        boxShadow: [
-                          BoxShadow(
-                            color: cardColor.withOpacity(0.18),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Icon(icon, size: 18, color: Colors.white),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      displayTitle,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF3d246c),
-                        letterSpacing: 1.1,
-                        overflow: TextOverflow.ellipsis,
-                        shadows: [
-                          Shadow(
-                            color: Colors.white70,
-                            blurRadius: 1,
-                            offset: Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      maxLines: 2,
-                    ),
-                    if (countLabel.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: cardColor.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '$countLabel：$count',
-                            style: TextStyle(
-                              color: cardColor.darken(0.18),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            maxLines: 1,
-                          ),
-                        ),
-                      ),
-                  ],
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: cardColor.withOpacity(0.28),
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(icon, color: cardColor.darken(0.18), size: 32),
                 ),
-              ),
+                const SizedBox(height: 12),
+                Text(displayTitle, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: cardColor.darken(0.18))),
+                if (countLabel.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: cardColor.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$countLabel：$count',
+                        style: TextStyle(
+                          color: cardColor.darken(0.18),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        maxLines: 1,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -485,6 +481,7 @@ IconData _iconFromKey(String key) {
     case 'inventory': return Icons.inventory;
     case 'event': return Icons.event;
     case 'bug_report': return Icons.bug_report;
+    case 'lightbulb': return Icons.lightbulb;
     default: return Icons.extension;
   }
 }
@@ -508,8 +505,8 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late Box box;
-  final List<String> modules = ['首页卡片', '密码本', '打卡', '物品管理', '纪念日', '日志'];
-  final List<String> keys = ['home', 'password', 'checkin', 'item', 'anniversary', 'log'];
+  final List<String> modules = ['首页卡片', '密码本', '打卡', '物品管理', '纪念日', '创意收集', '日志'];
+  final List<String> keys = ['home', 'password', 'checkin', 'item', 'anniversary', 'idea', 'log'];
   Map<String, int> colMap = {};
   Map<String, double> ratioMap = {};
   Map<String, double> hgapMap = {};
@@ -577,6 +574,12 @@ class _SettingsPageState extends State<SettingsPage> {
             title: const Text('纪念日'),
             children: [
               _buildSliderTile('纪念日', 'anniversary'),
+            ],
+          ),
+          ExpansionTile(
+            title: const Text('创意收集'),
+            children: [
+              _buildSliderTile('创意收集', 'idea'),
             ],
           ),
         ],
