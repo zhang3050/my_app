@@ -25,6 +25,7 @@ class IdeaItemAdapter extends TypeAdapter<IdeaItem> {
       isArchived: fields[4] as bool,
       isDeleted: fields[5] as bool,
       deletedAt: fields[6] as DateTime?,
+      isPinned: fields[8] as bool? ?? false,
     );
   }
 
@@ -47,7 +48,9 @@ class IdeaItemAdapter extends TypeAdapter<IdeaItem> {
       ..writeByte(6)
       ..write(obj.deletedAt)
       ..writeByte(7)
-      ..write(obj.title);
+      ..write(obj.title)
+      ..writeByte(8)
+      ..write(obj.isPinned);
   }
 
   @override

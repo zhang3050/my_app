@@ -19,6 +19,8 @@ class IdeaItem extends HiveObject {
   DateTime? deletedAt;
   @HiveField(7)
   String title;
+  @HiveField(8)
+  bool isPinned;
 
   IdeaItem({
     required this.title,
@@ -29,5 +31,6 @@ class IdeaItem extends HiveObject {
     this.isArchived = false,
     this.isDeleted = false,
     this.deletedAt,
+    this.isPinned = false,
   });
 } 

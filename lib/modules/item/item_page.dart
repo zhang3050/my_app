@@ -112,11 +112,16 @@ class _ItemPageState extends State<ItemPage> {
                 onPressed: () => Navigator.pop(context, {'move': true, 'newTag': selectedTag}),
                 child: const Text('转移'),
               ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text('取消操作'),
+              ),
             ],
           );
         },
       );
-      if (res != null && res['move'] == true && res['newTag'] != null) {
+      if (res == null) return;
+      if (res['move'] == true && res['newTag'] != null) {
         move = true;
         newTag = res['newTag'];
       }
@@ -129,7 +134,7 @@ class _ItemPageState extends State<ItemPage> {
         item.tag = newTag;
         await item.save();
       }
-    } else {
+    } else if (!move) {
       // 全部删除该标签下物品
       for (final item in itemsWithTag) {
         await item.delete();
