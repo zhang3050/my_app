@@ -304,7 +304,7 @@ class _HomePageState extends State<HomePage> {
               builder: (context, constraints) {
                 return GridView.builder(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.all(pad),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: col,
