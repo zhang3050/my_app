@@ -170,13 +170,18 @@ class _IdeaPageState extends State<IdeaPage> {
   Widget build(BuildContext context) {
     final allItems = [for (int i = 0; i < _box.length; i++) _box.getAt(i)!];
     final showItems = _search.isEmpty
-        ? (_filterTag == '全部' ? allItems : allItems.where((item) => item.tags.contains(_filterTag)).toList())
-        : allItems.where((item) {
-            final q = _search.toLowerCase();
-            return item.title.toLowerCase().contains(q) ||
-                item.tags.any((t) => t.toLowerCase().contains(q)) ||
-                item.content.toLowerCase().contains(q);
-          }).toList();
+        ? (_filterTag == '全部'
+            ? allItems.where((item) => !item.isDeleted && !item.isArchived).toList()
+            : allItems.where((item) => !item.isDeleted && !item.isArchived && item.tags.contains(_filterTag)).toList())
+        : allItems.where((item) =>
+            !item.isDeleted &&
+            !item.isArchived &&
+            (
+              item.title.toLowerCase().contains(_search.toLowerCase()) ||
+              item.tags.any((t) => t.toLowerCase().contains(_search.toLowerCase())) ||
+              item.content.toLowerCase().contains(_search.toLowerCase())
+            )
+          ).toList();
     // 假数据统计
     final total = allItems.length;
     final week = allItems.where((item) {
