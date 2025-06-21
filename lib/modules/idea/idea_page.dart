@@ -4,6 +4,8 @@ import 'idea_item.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'idea_export.dart';
 
 class IdeaPage extends StatefulWidget {
   const IdeaPage({super.key});
@@ -169,6 +171,11 @@ class _IdeaPageState extends State<IdeaPage> {
   @override
   Widget build(BuildContext context) {
     final allItems = [for (int i = 0; i < _box.length; i++) _box.getAt(i)!];
+    // 主列表排序：置顶优先，时间倒序
+    allItems.sort((a, b) {
+      if (a.isStar != b.isStar) return a.isStar ? -1 : 1;
+      return b.createdAt.compareTo(a.createdAt);
+    });
     final showItems = _search.isEmpty
         ? (_filterTag == '全部'
             ? allItems.where((item) => !item.isDeleted && !item.isArchived).toList()
@@ -183,11 +190,11 @@ class _IdeaPageState extends State<IdeaPage> {
             )
           ).toList();
     // 假数据统计
-    final total = allItems.length;
+    final total = allItems.where((item) => !item.isDeleted && !item.isArchived).length;
     final week = allItems.where((item) {
       final now = DateTime.now();
       final date = item.createdAt;
-      return now.difference(date).inDays <= 7;
+      return !item.isDeleted && !item.isArchived && now.difference(date).inDays <= 7;
     }).length;
     final todo = allItems.where((item) => item.tags.contains('待实施')).length;
 
@@ -434,6 +441,7 @@ class _IdeaPageState extends State<IdeaPage> {
                             return GestureDetector(
                               onTap: () => _addOrEditIdea(item: item, index: allItems.indexOf(item)),
                               onLongPress: () async {
+                                final realIndex = _box.values.toList().indexOf(item);
                                 final confirm = await showDialog<bool>(
                                   context: context,
                                   builder: (_) => AlertDialog(
@@ -451,7 +459,7 @@ class _IdeaPageState extends State<IdeaPage> {
                                     ],
                                   ),
                                 );
-                                if (confirm == true) _deleteIdea(allItems.indexOf(item));
+                                if (confirm == true) _deleteIdea(realIndex);
                               },
                               child: Container(
                                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
@@ -512,6 +520,15 @@ class _IdeaPageState extends State<IdeaPage> {
                                           ],
                                         ),
                                       ),
+                                      // 星标按钮
+                                      IconButton(
+                                        icon: Icon(item.isStar ? Icons.star : Icons.star_border, color: item.isStar ? Colors.orange : Colors.grey),
+                                        tooltip: item.isStar ? '取消星标' : '星标',
+                                        onPressed: () {
+                                          final realIndex = _box.values.toList().indexOf(item);
+                                          _toggleStar(realIndex);
+                                        },
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -567,7 +584,6 @@ class _IdeaEditPageState extends State<IdeaEditPage> {
   late TextEditingController _titleController;
   String _tag = '';
   late DateTime _date;
-  bool _isPinned = false;
 
   @override
   void initState() {
@@ -576,8 +592,6 @@ class _IdeaEditPageState extends State<IdeaEditPage> {
     _titleController = TextEditingController(text: widget.item?.title ?? '');
     _tag = widget.item?.tags.isNotEmpty == true ? widget.item!.tags.first : (widget.tags.isNotEmpty ? widget.tags.first : '');
     _date = widget.item?.createdAt ?? DateTime.now();
-    // 可选：置顶功能
-    // _isPinned = widget.item?.isPinned ?? false;
   }
 
   @override
@@ -602,6 +616,30 @@ class _IdeaEditPageState extends State<IdeaEditPage> {
         deletedAt: widget.item?.deletedAt,
       ),
     );
+  }
+
+  Future<void> _onShare() async {
+    // 只导出当前编辑卡片内容
+    final title = _titleController.text.trim().isEmpty ? '无标题' : _titleController.text.trim();
+    final content = _contentController.text.trim();
+    final tag = _tag;
+    final date = _date;
+    final buffer = StringBuffer();
+    buffer.writeln('标题: $title');
+    buffer.writeln('内容: $content');
+    buffer.writeln('标签: $tag');
+    buffer.writeln('时间: ${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}');
+    String? dir = await FilePicker.platform.getDirectoryPath(dialogTitle: '选择保存文件夹');
+    if (dir == null) return;
+    final file = File('$dir/${title.isEmpty ? '创意详情' : title}.txt');
+    try {
+      await file.writeAsString(buffer.toString());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('导出成功')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('导出失败')));
+    }
   }
 
   @override
@@ -629,8 +667,11 @@ class _IdeaEditPageState extends State<IdeaEditPage> {
         ),
         centerTitle: true,
         actions: [
-          IconButton(icon: const Icon(Icons.push_pin_outlined, color: Colors.black54), onPressed: () {/*置顶功能*/}),
-          IconButton(icon: const Icon(Icons.share, color: Colors.black54), onPressed: () {/*分享功能*/}),
+          IconButton(
+            icon: const Icon(Icons.share, color: Colors.black54),
+            tooltip: '导出txt',
+            onPressed: _onShare,
+          ),
           TextButton(
             onPressed: _onSave,
             child: const Text('保存', style: TextStyle(color: Color(0xFF5C6BC0), fontWeight: FontWeight.bold)),
