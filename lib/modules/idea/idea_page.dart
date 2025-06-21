@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'idea_item.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 
 class IdeaPage extends StatefulWidget {
   const IdeaPage({super.key});
@@ -17,7 +19,7 @@ class _IdeaPageState extends State<IdeaPage> {
   String _filterTag = '全部';
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _tagInputController = TextEditingController();
-  final List<String> _preTags = ['#产品灵感', '#技术方案', '#生活妙招', '#艺术创作'];
+  final List<String> _preTags = ['全部', '产品', 'UI', '营销', '内容', '技术', '办公', '生活', '创意'];
   List<String> _tags = [];
   int _starLimit = 5;
   IdeaViewType _viewType = IdeaViewType.all;
@@ -144,356 +146,223 @@ class _IdeaPageState extends State<IdeaPage> {
     }
   }
 
+  // 头像文字
+  String getAvatarText(String name) {
+    if (name.isEmpty) return '';
+    return name.length == 1 ? name : name.substring(0, 2);
+  }
+  // 头像颜色
+  Color getAvatarColor(String name) {
+    final colors = [
+      Color(0xFF5C6BC0), Color(0xFF42A5F5), Color(0xFF26A69A),
+      Color(0xFF66BB6A), Color(0xFFFFB74D), Color(0xFFBA68C8),
+      Color(0xFFEF5350), Color(0xFF8D6E63), Color(0xFF789262),
+      Color(0xFFB2B2B2)
+    ];
+    int hash = name.codeUnits.fold(0, (prev, elem) => prev + elem);
+    return colors[hash % colors.length];
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Column(
-          children: [
-            // 顶部标签栏和搜索框
-            Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, left: 12, right: 12, bottom: 2),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        ChoiceChip(
-                          label: const Text('全部'),
-                          selected: _filterTag == '全部',
-                          onSelected: (_) => setState(() => _filterTag = '全部'),
-                          selectedColor: Theme.of(context).colorScheme.primary,
-                          labelStyle: TextStyle(color: _filterTag == '全部' ? Colors.white : Colors.black87),
-                        ),
-                        ..._tags.map((tag) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: GestureDetector(
-                            onLongPress: () async {
-                              // 统计该标签下的创意数量
-                              final tagCount = _box.values.where((e) => e.tags.contains(tag)).length;
-                              if (tagCount == 0) {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('删除标签'),
-                                    content: Text('确定要删除标签"${tag}"吗？'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, false),
-                                        child: const Text('取消'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, true),
-                                        child: const Text('删除', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true) {
-                                  setState(() {
-                                    _tags.remove(tag);
-                                    if (_filterTag == tag) _filterTag = '全部';
-                                  });
-                                }
-                              } else {
-                                String? targetTag;
-                                final otherTags = _tags.where((t) => t != tag).toList();
-                                final confirm = await showDialog<String?>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('标签下有内容'),
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text('该标签下有 $tagCount 个创意。'),
-                                        const SizedBox(height: 12),
-                                        if (otherTags.isNotEmpty)
-                                          DropdownButtonFormField<String>(
-                                            value: otherTags.first,
-                                            items: otherTags.map((t) => DropdownMenuItem(value: t, child: Text('转移到 $t'))).toList(),
-                                            onChanged: (v) => targetTag = v,
-                                            decoration: const InputDecoration(labelText: '选择目标标签'),
-                                          ),
-                                        const SizedBox(height: 8),
-                                        const Text('或选择全部移除标签', style: TextStyle(fontSize: 13)),
-                                      ],
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, null),
-                                        child: const Text('取消'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context, ''),
-                                        child: const Text('全部移除', style: TextStyle(color: Colors.red)),
-                                      ),
-                                      if (otherTags.isNotEmpty)
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context, targetTag ?? otherTags.first),
-                                          child: const Text('转移'),
-                                        ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm != null) {
-                                  setState(() {
-                                    _tags.remove(tag);
-                                    if (_filterTag == tag) _filterTag = '全部';
-                                  });
-                                  for (var i = 0; i < _box.length; i++) {
-                                    final item = _box.getAt(i);
-                                    if (item != null && item.tags.contains(tag)) {
-                                      item.tags.remove(tag);
-                                      if (confirm.isNotEmpty) {
-                                        // 转移到目标标签
-                                        if (!item.tags.contains(confirm)) item.tags.add(confirm);
-                                      }
-                                      item.save();
-                                    }
-                                  }
-                                }
-                              }
-                            },
-                            child: ChoiceChip(
-                              label: Text(tag),
-                              selected: _filterTag == tag,
-                              onSelected: (_) => setState(() => _filterTag = tag),
-                              selectedColor: Theme.of(context).colorScheme.primary,
-                              labelStyle: TextStyle(color: _filterTag == tag ? Colors.white : Colors.black87),
-                            ),
-                          ),
-                        )),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: SizedBox(
-                            width: 90,
-                            child: TextField(
-                              controller: _tagInputController,
-                              decoration: const InputDecoration(
-                                hintText: '新标签',
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                              ),
-                              onSubmitted: (_) => _tryAddTag(),
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: ElevatedButton(
-                            onPressed: _tryAddTag,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFB2E5C8),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Icon(Icons.add, size: 20),
-                          ),
-                        ),
-                      ],
-                    ),
+    final allItems = [for (int i = 0; i < _box.length; i++) _box.getAt(i)!];
+    final showItems = _search.isEmpty
+        ? (_filterTag == '全部' ? allItems : allItems.where((item) => item.tags.contains(_filterTag)).toList())
+        : allItems.where((item) {
+            final q = _search.toLowerCase();
+            return item.title.toLowerCase().contains(q) ||
+                item.tags.any((t) => t.toLowerCase().contains(q)) ||
+                item.content.toLowerCase().contains(q);
+          }).toList();
+    // 假数据统计
+    final total = allItems.length;
+    final week = allItems.where((item) {
+      final now = DateTime.now();
+      final date = item.createdAt;
+      return now.difference(date).inDays <= 7;
+    }).length;
+    final todo = allItems.where((item) => item.tags.contains('待实施')).length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Column(
+            children: [
+              // 搜索框
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F3F7),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   child: TextField(
                     controller: _searchController,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search),
-                      hintText: '搜索创意/标签/日期',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search, color: Color(0xFF5C6BC0)),
+                      hintText: '搜索创意、关键词或标签...',
+                      border: InputBorder.none,
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                      suffixIcon: _search.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                setState(() {
-                                  _search = '';
-                                  _searchController.clear();
-                                });
-                              },
-                            )
-                          : null,
+                      contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 0),
                     ),
                     onChanged: (v) => setState(() => _search = v.trim()),
                   ),
                 ),
-              ],
-            ),
-            // 内容区
-            Expanded(
-              child: ValueListenableBuilder(
-                valueListenable: _box.listenable(),
-                builder: (context, Box<IdeaItem> box, _) {
-                  final List<IdeaItem> allItems = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
-                  List<IdeaItem> items;
-                  if (_viewType == IdeaViewType.all) {
-                    items = allItems.where((e) => !e.isDeleted && !e.isArchived).toList();
-                  } else {
-                    final now = DateTime.now();
-                    items = allItems.where((e) => e.isDeleted && e.deletedAt != null && now.difference(e.deletedAt!).inDays < 7).toList();
-                  }
-                  // 标签筛选
-                  final List<IdeaItem> filtered = _filterTag == '全部' ? items : items.where((item) => item.tags.contains(_filterTag)).toList();
-                  // 搜索
-                  final List<IdeaItem> showItems = _search.isEmpty
-                      ? filtered
-                      : filtered.where((item) {
-                          final q = _search.toLowerCase();
-                          return item.content.toLowerCase().contains(q) ||
-                              item.tags.any((t) => t.toLowerCase().contains(q)) ||
-                              item.createdAt.toString().contains(q);
-                        }).toList();
-                  // 时间倒序，星标置顶
-                  showItems.sort((a, b) {
-                    if (a.isStar != b.isStar) return b.isStar ? 1 : -1;
-                    return b.createdAt.compareTo(a.createdAt);
-                  });
-                  if (showItems.isEmpty) {
-                    if (_viewType == IdeaViewType.all) {
-                      return const Center(child: Text('暂无创意，点击右下角"+"添加', style: TextStyle(fontSize: 18)));
-                    } else {
-                      return const SizedBox.shrink();
-                    }
-                  }
-                  return Padding(
-                    padding: EdgeInsets.all(pad),
-                    child: GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: col,
-                        crossAxisSpacing: hgap,
-                        mainAxisSpacing: vgap,
-                        childAspectRatio: ratio,
+              ),
+              // 统计区
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    _buildStatCard(total.toString(), '全部创意'),
+                    const SizedBox(width: 12),
+                    _buildStatCard(week.toString(), '本周新增'),
+                  ],
+                ),
+              ),
+              // 标签筛选区
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _tags.map((tag) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ChoiceChip(
+                        label: Text(tag),
+                        selected: _filterTag == tag,
+                        onSelected: (_) => setState(() => _filterTag = tag),
+                        selectedColor: const Color(0xFF5C6BC0),
+                        backgroundColor: const Color(0xFFF3F3F7),
+                        labelStyle: TextStyle(color: _filterTag == tag ? Colors.white : Colors.black87),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
-                      itemCount: showItems.length,
-                      itemBuilder: (context, index) {
-                        final item = showItems[index];
-                        return Dismissible(
-                          key: ValueKey(item.key),
-                          direction: _viewType == IdeaViewType.all ? DismissDirection.startToEnd : DismissDirection.none,
-                          background: Container(
-                            alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.only(left: 24),
-                            color: Colors.blueGrey[100],
-                            child: const Icon(Icons.archive, color: Colors.blueGrey, size: 32),
-                          ),
-                          onDismissed: _viewType == IdeaViewType.all ? (_) => _archiveIdea(allItems.indexOf(item)) : null,
-                          child: GestureDetector(
+                    )).toList(),
+                  ),
+                ),
+              ),
+              // 创意列表
+              Expanded(
+                child: showItems.isEmpty
+                    ? const Center(child: Text('暂无创意，点击右下角"+"添加', style: TextStyle(fontSize: 18)))
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
+                        itemCount: showItems.length,
+                        itemBuilder: (context, index) {
+                          final item = showItems[index];
+                          return GestureDetector(
                             onTap: () => _addOrEditIdea(item: item, index: allItems.indexOf(item)),
-                            onLongPress: () {
-                              if (_viewType == IdeaViewType.all) {
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text('删除创意'),
-                                    content: const Text('确定要删除该创意吗？删除后可在回收站找回。'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('取消'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          _deleteIdea(allItems.indexOf(item));
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text('删除', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              } else if (_viewType == IdeaViewType.trash) {
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => AlertDialog(
-                                    title: const Text('彻底删除'),
-                                    content: const Text('确定要彻底删除该创意吗？此操作不可恢复。'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('取消'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () {
-                                          _deleteForever(allItems.indexOf(item));
-                                          Navigator.pop(context);
-                                        },
-                                        child: const Text('删除', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }
+                            onLongPress: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('删除创意'),
+                                  content: const Text('确定要删除该创意吗？'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('取消'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      child: const Text('删除', style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) _deleteIdea(allItems.indexOf(item));
                             },
-                            child: Card(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              elevation: 3,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.06),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
                               child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                padding: const EdgeInsets.all(14),
+                                child: Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        const Spacer(),
-                                        if (item.isStar)
-                                          const Icon(Icons.star, color: Colors.amber, size: 22),
-                                      ],
+                                    // 左侧头像
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: getAvatarColor(item.title),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        getAvatarText(item.title),
+                                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                      ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      item.title,
-                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Wrap(
-                                      spacing: 4,
-                                      runSpacing: 2,
-                                      children: item.tags.map((t) => Chip(label: Text(t, style: const TextStyle(fontSize: 12)))).toList(),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${item.createdAt.year}-${item.createdAt.month.toString().padLeft(2, '0')}-${item.createdAt.day.toString().padLeft(2, '0')} ${item.createdAt.hour.toString().padLeft(2, '0')}:${item.createdAt.minute.toString().padLeft(2, '0')}',
-                                      style: const TextStyle(fontSize: 12, color: Colors.black45),
+                                    const SizedBox(width: 14),
+                                    // 右侧内容
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(item.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF22223B))),
+                                          const SizedBox(height: 4),
+                                          Text('${item.createdAt.year}-${item.createdAt.month.toString().padLeft(2, '0')}-${item.createdAt.day.toString().padLeft(2, '0')}', style: const TextStyle(fontSize: 13, color: Colors.blueGrey)),
+                                          const SizedBox(height: 4),
+                                          Text(item.content, style: const TextStyle(fontSize: 13, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
+                          );
+                        },
+                      ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _addOrEditIdea(),
+        backgroundColor: const Color(0xFF5C6BC0),
+        child: const Icon(Icons.add, size: 30),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String value, String label) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF6F9FC),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          children: [
+            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF22223B))),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF7B8FA1))),
           ],
         ),
-        // 右下角添加按钮
-        if (_viewType == IdeaViewType.all)
-          Positioned(
-            right: 24,
-            bottom: 32,
-            child: FloatingActionButton(
-              onPressed: () => _addOrEditIdea(),
-              child: const Icon(Icons.add),
-              tooltip: '添加创意',
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 4,
-            ),
-          ),
-      ],
+      ),
     );
   }
 }
@@ -509,178 +378,114 @@ class IdeaEditPage extends StatefulWidget {
 
 class _IdeaEditPageState extends State<IdeaEditPage> {
   late TextEditingController _contentController;
-  late TextEditingController _tagInputController;
   late TextEditingController _titleController;
   String _tag = '';
-  bool _showPreview = false;
+  late DateTime _date;
+  bool _isPinned = false;
 
   @override
   void initState() {
     super.initState();
     _contentController = TextEditingController(text: widget.item?.content ?? '');
-    _tagInputController = TextEditingController();
     _titleController = TextEditingController(text: widget.item?.title ?? '');
     _tag = widget.item?.tags.isNotEmpty == true ? widget.item!.tags.first : (widget.tags.isNotEmpty ? widget.tags.first : '');
+    _date = widget.item?.createdAt ?? DateTime.now();
+    // 可选：置顶功能
+    // _isPinned = widget.item?.isPinned ?? false;
   }
 
   @override
   void dispose() {
     _contentController.dispose();
-    _tagInputController.dispose();
     _titleController.dispose();
     super.dispose();
   }
 
-  void _tryAddTag() {
-    final input = _tagInputController.text.trim();
-    if (input.isNotEmpty && !widget.tags.contains(input)) {
-      widget.onAddTag?.call(input);
-      setState(() {
-        _tag = input;
-        _tagInputController.clear();
-      });
-    } else if (input.isNotEmpty && widget.tags.contains(input)) {
-      setState(() {
-        _tag = input;
-        _tagInputController.clear();
-      });
-    }
+  void _onSave() {
+    if (_titleController.text.trim().isEmpty && _contentController.text.trim().isEmpty) return;
+    Navigator.pop(
+      context,
+      IdeaItem(
+        title: _titleController.text.trim().isEmpty ? '无标题' : _titleController.text.trim(),
+        content: _contentController.text.trim(),
+        tags: [_tag],
+        createdAt: _date,
+        isStar: widget.item?.isStar ?? false,
+        isArchived: widget.item?.isArchived ?? false,
+        isDeleted: widget.item?.isDeleted ?? false,
+        deletedAt: widget.item?.deletedAt,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.item == null ? '添加创意' : '编辑创意'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: DropdownButton<String>(
+          value: _tag,
+          underline: const SizedBox(),
+          items: widget.tags.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+          onChanged: (v) => setState(() => _tag = v ?? _tag),
+          style: const TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.bold),
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.black54),
+        ),
+        centerTitle: true,
         actions: [
-          IconButton(
-            icon: Icon(_showPreview ? Icons.edit : Icons.remove_red_eye),
-            tooltip: _showPreview ? '编辑' : '预览',
-            onPressed: () => setState(() => _showPreview = !_showPreview),
+          IconButton(icon: const Icon(Icons.push_pin_outlined, color: Colors.black54), onPressed: () {/*置顶功能*/}),
+          IconButton(icon: const Icon(Icons.share, color: Colors.black54), onPressed: () {/*分享功能*/}),
+          TextButton(
+            onPressed: _onSave,
+            child: const Text('保存', style: TextStyle(color: Color(0xFF5C6BC0), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: '标题（必填）', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
-              maxLength: 30,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 20, top: 8, bottom: 8),
+            child: Text(
+              '${_date.year}/${_date.month.toString().padLeft(2, '0')}/${_date.day.toString().padLeft(2, '0')} ${_date.hour.toString().padLeft(2, '0')}:${_date.minute.toString().padLeft(2, '0')}',
+              style: TextStyle(fontSize: 13, color: Colors.grey[400]),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: widget.tags.map((t) => ChoiceChip(
-                label: Text(t, style: const TextStyle(fontSize: 12)),
-                selected: _tag == t,
-                onSelected: (_) => setState(() => _tag = t),
-                selectedColor: Theme.of(context).colorScheme.primary,
-                labelStyle: TextStyle(color: _tag == t ? Colors.white : Colors.black87, fontSize: 12),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              )).toList(),
+          ),
+          // 标题输入
+          TextField(
+            controller: _titleController,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+            decoration: const InputDecoration(
+              hintText: '无标题',
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                SizedBox(
-                  width: 100,
-                  child: TextField(
-                    controller: _tagInputController,
-                    decoration: const InputDecoration(
-                      hintText: '新标签',
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                    ),
-                    onSubmitted: (_) => _tryAddTag(),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                ElevatedButton(
-                  onPressed: _tryAddTag,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFB2E5C8),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    minimumSize: const Size(32, 32),
-                  ),
-                  child: const Icon(Icons.add, size: 18),
-                ),
-              ],
+            maxLines: 1,
+          ),
+          Divider(height: 1, thickness: 1, color: Color(0xFFF3F3F7)),
+          // 内容输入
+          Expanded(
+            child: TextField(
+              controller: _contentController,
+              style: const TextStyle(fontSize: 16, color: Colors.black87),
+              decoration: const InputDecoration(
+                hintText: '在这里输入内容',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
+              cursorColor: Color(0xFF5C6BC0),
             ),
-            const SizedBox(height: 18),
-            // 内容编辑框更大
-            !_showPreview
-                ? TextField(
-                    controller: _contentController,
-                    decoration: const InputDecoration(labelText: '创意内容（支持Markdown）', filled: true, fillColor: Colors.white70, border: OutlineInputBorder()),
-                    minLines: 16,
-                    maxLines: null,
-                  )
-                : Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SingleChildScrollView(
-                      child: MarkdownBody(
-                        data: _contentController.text,
-                        styleSheet: MarkdownStyleSheet(
-                          p: const TextStyle(fontSize: 15, height: 1.4),
-                        ),
-                        softLineBreak: true,
-                        shrinkWrap: true,
-                      ),
-                    ),
-                  ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
-                  child: const Text('取消'),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF185a9d),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    if (_titleController.text.trim().isEmpty) return;
-                    if (_contentController.text.trim().isEmpty) return;
-                    Navigator.pop(
-                      context,
-                      IdeaItem(
-                        title: _titleController.text.trim(),
-                        content: _contentController.text.trim(),
-                        tags: [_tag],
-                        createdAt: widget.item?.createdAt ?? DateTime.now(),
-                        isStar: widget.item?.isStar ?? false,
-                        isArchived: widget.item?.isArchived ?? false,
-                        isDeleted: widget.item?.isDeleted ?? false,
-                        deletedAt: widget.item?.deletedAt,
-                      ),
-                    );
-                  },
-                  child: const Text('保存'),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-} 
+}

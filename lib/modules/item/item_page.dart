@@ -165,196 +165,258 @@ class _ItemPageState extends State<ItemPage> {
           if (_tagDeleteMode) _exitTagDeleteMode();
         },
         child: Scaffold(
-          body: Column(
-            children: [
-              // 标签筛选区
-              if (_tags.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12, left: 12, right: 12, bottom: 2),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        ChoiceChip(
-                          label: const Text('全部'),
-                          selected: _filterTag == '全部',
-                          onSelected: (_) => setState(() => _filterTag = '全部'),
-                          selectedColor: Theme.of(context).colorScheme.primary,
-                          labelStyle: TextStyle(color: _filterTag == '全部' ? Colors.white : Colors.black87),
-                        ),
-                        ..._tags.map((tag) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: _TagChip(
-                            tag: tag,
-                            selected: _filterTag == tag,
-                            deleteMode: _tagDeleteMode && _tagDeleteTarget == tag,
-                            onSelect: () {
-                              if (_tagDeleteMode) {
-                                _exitTagDeleteMode();
-                              } else {
-                                setState(() => _filterTag = tag);
-                              }
-                            },
-                            onLongPress: () => _enterTagDeleteMode(tag),
-                            onDelete: () async { await _handleDeleteTag(tag); },
+          backgroundColor: const Color(0xFFF7F8FA),
+          body: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                children: [
+                  // 搜索框（最上方，圆角阴影）
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F3F7),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
-                        )),
-                      ],
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search, color: Color(0xFF185a9d)),
+                          hintText: '搜索物品...',
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
+                          suffixIcon: _search.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, color: Colors.grey),
+                                  onPressed: () {
+                                    setState(() {
+                                      _search = '';
+                                      _searchController.clear();
+                                    });
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (v) => setState(() => _search = v.trim()),
+                      ),
                     ),
                   ),
-                ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    hintText: '搜索物品名称、标签、备注...（支持模糊搜索）',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                    suffixIcon: _search.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              setState(() {
-                                _search = '';
-                                _searchController.clear();
-                              });
-                            },
-                          )
-                        : null,
-                  ),
-                  onChanged: (v) => setState(() => _search = v.trim()),
-                ),
-              ),
-              Expanded(
-                child: ValueListenableBuilder(
-                  valueListenable: _box.listenable(),
-                  builder: (context, Box<Item> box, _) {
-                    final List<Item> allItems = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
-                    final List<Item> filtered = _filterTag == '全部' ? allItems : allItems.where((item) => item.tag == _filterTag).toList();
-                    final List<Item> items = _search.isEmpty
-                        ? filtered
-                        : filtered.where((item) {
-                            final q = _search.toLowerCase();
-                            return item.name.toLowerCase().contains(q) ||
-                                item.tag.toLowerCase().contains(q) ||
-                                item.notes.toLowerCase().contains(q);
-                          }).toList();
-                    if (items.isEmpty) {
-                      return const Center(child: Text('暂无匹配物品，换个关键词试试', style: TextStyle(fontSize: 18)));
-                    }
-                    return GridView.builder(
-                      padding: EdgeInsets.all(() {
-                        try { return Hive.box('main_sort').get('item_pad') as double? ?? 16; } catch (_) { return 16.0; }
-                      }()),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: (() {
-                          try { return Hive.box('main_sort').get('item_col') as int? ?? 2; } catch (_) { return 2; }
-                        })(),
-                        crossAxisSpacing: (() {
-                          try { return Hive.box('main_sort').get('item_hgap') as double? ?? 16; } catch (_) { return 16.0; }
-                        })(),
-                        mainAxisSpacing: (() {
-                          try { return Hive.box('main_sort').get('item_vgap') as double? ?? 16; } catch (_) { return 16.0; }
-                        })(),
-                        childAspectRatio: (() {
-                          try { return Hive.box('main_sort').get('item_ratio') as double? ?? 0.85; } catch (_) { return 0.85; }
-                        })(),
-                      ),
-                      itemCount: items.length,
-                      itemBuilder: (context, index) {
-                        final item = items[index];
-                        return GestureDetector(
-                          onTap: () => _addOrEditItem(item: item, index: allItems.indexOf(item)), // 点击编辑
-                          onLongPress: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: const Text('删除物品'),
-                                content: Text('确定要删除"${item.name}"吗？'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context, false),
-                                    child: const Text('取消'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context, true),
-                                    child: const Text('删除', style: TextStyle(color: Colors.red)),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) _deleteItem(allItems.indexOf(item));
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFB2E5C8), Colors.white],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Color(0xFFB2E5C8).withOpacity(0.10),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
+                  // 统计区
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Builder(
+                      builder: (context) {
+                        final allItems = [for (int i = 0; i < _box.length; i++) _box.getAt(i)!];
+                        final totalCount = allItems.length;
+                        final totalValue = allItems.fold<double>(0, (sum, item) => sum + (item.price ?? 0));
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF6F9FC),
+                                  borderRadius: BorderRadius.circular(18),
                                 ),
-                              ],
-                              border: Border.all(color: Color(0xFFB2E5C8).withOpacity(0.18), width: 1.2),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('库存总数', style: TextStyle(fontSize: 15, color: Color(0xFF7B8FA1))),
+                                    const SizedBox(height: 6),
+                                    Text('$totalCount项', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF22223B))),
+                                  ],
+                                ),
+                              ),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 10),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: const BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Color(0xFFB2E5C8),
-                                        ),
-                                        child: const Icon(Icons.inventory, color: Colors.white, size: 22),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF6F9FC),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('库存价值', style: TextStyle(fontSize: 15, color: Color(0xFF7B8FA1))),
+                                    const SizedBox(height: 6),
+                                    Text('¥${totalValue.toStringAsFixed(2)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF22223B))),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  // 标签筛选区
+                  if (_tags.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ChoiceChip(
+                              label: const Text('全部'),
+                              selected: _filterTag == '全部',
+                              onSelected: (_) => setState(() => _filterTag = '全部'),
+                              selectedColor: const Color(0xFF185a9d),
+                              backgroundColor: const Color(0xFFF3F3F7),
+                              labelStyle: TextStyle(color: _filterTag == '全部' ? Colors.white : Colors.black87),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                            ..._tags.map((tag) => Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: _TagChip(
+                                tag: tag,
+                                selected: _filterTag == tag,
+                                deleteMode: _tagDeleteMode && _tagDeleteTarget == tag,
+                                onSelect: () {
+                                  if (_tagDeleteMode) {
+                                    _exitTagDeleteMode();
+                                  } else {
+                                    setState(() => _filterTag = tag);
+                                  }
+                                },
+                                onLongPress: () => _enterTagDeleteMode(tag),
+                                onDelete: () async { await _handleDeleteTag(tag); },
+                              ),
+                            )),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // 物品列表
+                  Expanded(
+                    child: ValueListenableBuilder(
+                      valueListenable: _box.listenable(),
+                      builder: (context, Box<Item> box, _) {
+                        final List<Item> allItems = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
+                        final List<Item> filtered = _filterTag == '全部' ? allItems : allItems.where((item) => item.tag == _filterTag).toList();
+                        final List<Item> items = _search.isEmpty
+                            ? filtered
+                            : filtered.where((item) {
+                                final q = _search.toLowerCase();
+                                return item.name.toLowerCase().contains(q) ||
+                                    item.tag.toLowerCase().contains(q) ||
+                                    item.notes.toLowerCase().contains(q);
+                              }).toList();
+                        if (items.isEmpty) {
+                          return const Center(child: Text('暂无匹配物品，换个关键词试试', style: TextStyle(fontSize: 18)));
+                        }
+                        return ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          itemCount: items.length,
+                          itemBuilder: (context, index) {
+                            final item = items[index];
+                            return GestureDetector(
+                              onTap: () => _addOrEditItem(item: item, index: allItems.indexOf(item)), // 点击编辑
+                              onLongPress: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => AlertDialog(
+                                    title: const Text('删除物品'),
+                                    content: Text('确定要删除"${item.name}"吗？'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, false),
+                                        child: const Text('取消'),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context, true),
+                                        child: const Text('删除', style: TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) _deleteItem(allItems.indexOf(item));
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.06),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                  border: Border.all(color: const Color(0xFF185a9d).withOpacity(0.10), width: 1),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: [
+                                      // 左侧icon或图片
+                                      Container(
+                                        width: 54,
+                                        height: 54,
+                                        decoration: BoxDecoration(
+                                          color: getAvatarColor(item.name),
+                                          borderRadius: BorderRadius.circular(27),
+                                        ),
+                                        alignment: Alignment.center,
                                         child: Text(
-                                          item.name,
-                                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c)),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          textAlign: TextAlign.center,
+                                          getAvatarText(item.name),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      // 右侧信息区
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(item.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF22223B)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                            const SizedBox(height: 4),
+                                            Text('标签: ${item.tag}', style: const TextStyle(fontSize: 13, color: Colors.blueGrey)),
+                                            const SizedBox(height: 4),
+                                            Text('价格: ¥${_formatPrice(item.price)}', style: const TextStyle(fontSize: 14, color: Colors.deepOrange)),
+                                            if (item.notes.isNotEmpty)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 2),
+                                                child: Text(item.notes, style: const TextStyle(fontSize: 12, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                              ),
+                                          ],
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  Text('标签: ${item.tag}', style: const TextStyle(fontSize: 15, color: Colors.blueGrey), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center),
-                                  const SizedBox(height: 10),
-                                  Text('价格: ¥${_formatPrice(item.price)}', style: const TextStyle(fontSize: 16, color: Colors.deepOrange), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                ],
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
           floatingActionButton: FloatingActionButton(
             onPressed: () => _addOrEditItem(),
-            tooltip: '添加物品',
-            child: const Icon(Icons.add),
+            backgroundColor: const Color(0xFF185a9d),
+            child: const Icon(Icons.add, size: 30),
           ),
         ),
       );
@@ -568,4 +630,22 @@ class _TagChip extends StatelessWidget {
       ),
     );
   }
+}
+
+// 取物品名首字母或前两个字
+String getAvatarText(String name) {
+  if (name.isEmpty) return '';
+  return name.length == 1 ? name : name.substring(0, 2);
+}
+
+// 可选：根据名称生成颜色
+Color getAvatarColor(String name) {
+  final colors = [
+    Color(0xFFa58cf9), Color(0xFF5ec6fa), Color(0xFF6edba3),
+    Color(0xFFf7b267), Color(0xFFf48498), Color(0xFFb5aeea),
+    Color(0xFFf7d6e0), Color(0xFFb2e5c8), Color(0xFFffd580),
+    Color(0xFFb2b2b2)
+  ];
+  int hash = name.codeUnits.fold(0, (prev, elem) => prev + elem);
+  return colors[hash % colors.length];
 } 

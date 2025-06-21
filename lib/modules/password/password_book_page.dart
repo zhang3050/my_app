@@ -53,159 +53,203 @@ class _PasswordBookPageState extends State<PasswordBookPage> {
   Widget build(BuildContext context) {
     try {
       return Scaffold(
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.search),
-                  hintText: '搜索标题、账号、备注...（支持模糊搜索）',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                  suffixIcon: _search.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _search = '';
-                              _searchController.clear();
-                            });
-                          },
-                        )
-                      : null,
-                ),
-                onChanged: (v) => setState(() => _search = v.trim()),
-              ),
-            ),
-            Expanded(
-              child: ValueListenableBuilder(
-                valueListenable: _box.listenable(),
-                builder: (context, Box<PasswordItem> box, _) {
-                  final List<PasswordItem> allItems = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
-                  final List<PasswordItem> items = _search.isEmpty
-                      ? allItems
-                      : allItems.where((item) {
-                          final q = _search.toLowerCase();
-                          return item.title.toLowerCase().contains(q) ||
-                              item.username.toLowerCase().contains(q) ||
-                              item.notes.toLowerCase().contains(q);
-                        }).toList();
-                  if (items.isEmpty) {
-                    return const Center(child: Text('暂无匹配密码，换个关键词试试', style: TextStyle(fontSize: 18)));
-                  }
-                  return GridView.builder(
-                    padding: EdgeInsets.all(() {
-                      try { return Hive.box('main_sort').get('password_pad') as double? ?? 16; } catch (_) { return 16.0; }
-                    }()),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: (() {
-                        try { return Hive.box('main_sort').get('password_col') as int? ?? 2; } catch (_) { return 2; }
-                      })(),
-                      crossAxisSpacing: (() {
-                        try { return Hive.box('main_sort').get('password_hgap') as double? ?? 16; } catch (_) { return 16.0; }
-                      })(),
-                      mainAxisSpacing: (() {
-                        try { return Hive.box('main_sort').get('password_vgap') as double? ?? 16; } catch (_) { return 16.0; }
-                      })(),
-                      childAspectRatio: (() {
-                        try { return Hive.box('main_sort').get('password_ratio') as double? ?? 1.2; } catch (_) { return 1.2; }
-                      })(),
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              children: [
+                // 搜索框
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F3F7),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    itemCount: items.length,
-                    itemBuilder: (context, index) {
-                      final item = items[index];
-                      return GestureDetector(
-                        onTap: () => _addOrEditPassword(item: item, index: allItems.indexOf(item)), // 点击编辑
-                        onLongPress: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text('删除密码'),
-                              content: Text('确定要删除"${item.title}"吗？'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
-                                  child: const Text('取消'),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search, color: Color(0xFFa58cf9)),
+                        hintText: '搜索密码...',
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 0),
+                        suffixIcon: _search.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, color: Colors.grey),
+                                onPressed: () {
+                                  setState(() {
+                                    _search = '';
+                                    _searchController.clear();
+                                  });
+                                },
+                              )
+                            : null,
+                      ),
+                      onChanged: (v) => setState(() => _search = v.trim()),
+                    ),
+                  ),
+                ),
+                // 分组标题
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                  child: Row(
+                    children: [
+                      const Text(
+                        '已保存的密码',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF22223B),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F3F7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${_box.length}项',
+                          style: const TextStyle(fontSize: 13, color: Colors.grey),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ValueListenableBuilder(
+                    valueListenable: _box.listenable(),
+                    builder: (context, Box<PasswordItem> box, _) {
+                      final List<PasswordItem> allItems = [for (int i = 0; i < box.length; i++) box.getAt(i)!];
+                      final List<PasswordItem> items = _search.isEmpty
+                          ? allItems
+                          : allItems.where((item) {
+                              final q = _search.toLowerCase();
+                              return item.title.toLowerCase().contains(q) ||
+                                  item.username.toLowerCase().contains(q) ||
+                                  item.notes.toLowerCase().contains(q);
+                            }).toList();
+                      if (items.isEmpty) {
+                        return const Center(child: Text('暂无匹配密码，换个关键词试试', style: TextStyle(fontSize: 18)));
+                      }
+                      return GridView.builder(
+                        padding: EdgeInsets.all(() {
+                          try { return Hive.box('main_sort').get('password_pad') as double? ?? 16; } catch (_) { return 16.0; }
+                        }()),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: (() {
+                            try { return Hive.box('main_sort').get('password_col') as int? ?? 2; } catch (_) { return 2; }
+                          })(),
+                          crossAxisSpacing: (() {
+                            try { return Hive.box('main_sort').get('password_hgap') as double? ?? 16; } catch (_) { return 16.0; }
+                          })(),
+                          mainAxisSpacing: (() {
+                            try { return Hive.box('main_sort').get('password_vgap') as double? ?? 16; } catch (_) { return 16.0; }
+                          })(),
+                          childAspectRatio: (() {
+                            try { return Hive.box('main_sort').get('password_ratio') as double? ?? 1.2; } catch (_) { return 1.2; }
+                          })(),
+                        ),
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final item = items[index];
+                          return GestureDetector(
+                            onTap: () => _addOrEditPassword(item: item, index: allItems.indexOf(item)), // 点击编辑
+                            onLongPress: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  title: const Text('删除密码'),
+                                  content: Text('确定要删除"${item.title}"吗？'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('取消'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      child: const Text('删除', style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
                                 ),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context, true),
-                                  child: const Text('删除', style: TextStyle(color: Colors.red)),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) _deletePassword(allItems.indexOf(item));
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFA5D6F9), Colors.white],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0xFFA5D6F9).withOpacity(0.10),
-                                blurRadius: 12,
-                                offset: const Offset(0, 6),
+                              );
+                              if (confirm == true) _deletePassword(allItems.indexOf(item));
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.06),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                                border: Border.all(color: const Color(0xFFa58cf9).withOpacity(0.10), width: 1),
                               ),
-                            ],
-                            border: Border.all(color: Color(0xFFA5D6F9).withOpacity(0.18), width: 1.2),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 10),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 10),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Container(
-                                      width: 36,
-                                      height: 36,
+                                      width: 40,
+                                      height: 40,
                                       decoration: const BoxDecoration(
                                         shape: BoxShape.circle,
-                                        color: Color(0xFFA5D6F9),
+                                        color: Color(0xFFa58cf9),
                                       ),
                                       child: const Icon(Icons.lock, color: Colors.white, size: 22),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 12),
                                     Expanded(
-                                      child: Text(
-                                        item.title,
-                                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3d246c)),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        textAlign: TextAlign.center,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.title,
+                                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF22223B)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text('账号: ${item.username}', style: const TextStyle(fontSize: 14, color: Colors.blueGrey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          const SizedBox(height: 2),
+                                          Text('备注: ${item.notes}', style: const TextStyle(fontSize: 13, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 12),
-                                Text('账号: ${item.username}', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
-                                const SizedBox(height: 10),
-                                Text('备注: ${item.notes}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, color: Colors.grey), textAlign: TextAlign.center),
-                              ],
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _addOrEditPassword(),
-          tooltip: '添加密码',
-          child: const Icon(Icons.add),
+          backgroundColor: const Color(0xFFa58cf9),
+          child: const Icon(Icons.add, size: 30),
         ),
       );
     } catch (e, s) {
